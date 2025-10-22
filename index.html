@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HashShelf — Link-based book tracker</title>
+    <meta name="description" content="A fully client-side, hash-driven book tracker." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%23%3C/text%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo">#</span>
+        <span class="title">HashShelf</span>
+      </div>
+      <div class="header-actions">
+        <label class="toggle">
+          <input type="checkbox" id="privacyToggle" />
+          <span>Privacy mode</span>
+        </label>
+        <button id="exportJsonBtn" class="secondary">Export JSON</button>
+        <button id="importJsonBtn" class="secondary">Import JSON</button>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="notice" class="notice is-hidden"></section>
+
+      <section id="editorView" class="view">
+        <h2 id="listTitle">Your books</h2>
+        <label class="name-label">
+          Name
+          <input id="displayName" type="text" placeholder="Your name" />
+        </label>
+        <form id="bookForm" class="card book-form">
+          <div class="form-main">
+            <label>
+              Search by title
+              <input id="titleSearch" type="text" placeholder="e.g. The Odyssey" autocomplete="off" />
+            </label>
+            <div id="titleSuggestions" class="suggestions is-hidden"></div>
+            <div class="row">
+              <label>
+                ID Type
+                <select id="idType">
+                  <option value="work">work</option>
+                  <option value="isbn">isbn</option>
+                  <option value="edition">edition</option>
+                </select>
+              </label>
+              <label class="grow">
+                ID (Work ID or ISBN)
+                <input id="bookId" type="text" placeholder="e.g. OL45883W or 9780140449136" />
+              </label>
+            </div>
+            <div class="row">
+              <label>
+                Rating
+                <select id="rating">
+                  <option value="">—</option>
+                  <option value="0">0</option>
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select id="status">
+                  <option value="want">want</option>
+                  <option value="reading">reading</option>
+                  <option value="finished">finished</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Comment
+              <textarea id="comment" rows="3" placeholder="Optional notes"></textarea>
+            </label>
+          </div>
+          <aside class="form-side">
+            <img id="formCoverPreview" class="cover is-hidden" alt="cover" />
+            <div class="actions-side">
+              <button id="addBookBtn" class="primary" type="submit">Add book</button>
+              <button id="clearFormBtn" class="secondary" type="button">Clear</button>
+            </div>
+          </aside>
+        </form>
+
+        <div class="filters">
+          <label class="grow">
+            Status
+            <select id="editorFilterSelect" class="select-filter">
+              <option value="all" selected>all</option>
+              <option value="want">want</option>
+              <option value="reading">reading</option>
+              <option value="finished">read</option>
+            </select>
+          </label>
+        </div>
+        <div id="editorList" class="list"></div>
+
+        <div class="snapshot card">
+          <button id="createSnapshotBtn" class="primary">Create HashShelf</button>
+          <div id="snapshotOutput" class="snapshot-output is-hidden">
+            <input id="snapshotLink" type="text" readonly />
+            <button id="copyLinkBtn" class="secondary">Copy</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="viewerView" class="view is-hidden">
+        <div class="row between">
+          <h2>HashShelf</h2>
+          <a id="backToEditor" href="#" class="secondary link">Edit your list</a>
+        </div>
+        <div class="filters">
+          <label class="grow">
+            Status
+            <select id="viewerFilterSelect" class="select-filter">
+              <option value="all" selected>all</option>
+              <option value="want">want</option>
+              <option value="reading">reading</option>
+              <option value="finished">read</option>
+            </select>
+          </label>
+        </div>
+        <div id="viewerList" class="list"></div>
+      </section>
+    </main>
+
+    <dialog id="importDialog">
+      <form method="dialog" class="dialog">
+        <h3>Import JSON</h3>
+        <textarea id="importTextarea" rows="10" placeholder='{"v":1,"books":[...]}'></textarea>
+        <div class="row right">
+          <button value="cancel" class="secondary">Cancel</button>
+          <button id="confirmImportBtn" value="default" class="primary">Import</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+        });
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+    <script src="./snapshot.js"></script>
+    <script src="./openlibrary.js"></script>
+    <script src="./ui.js"></script>
+  </body>
+  </html>
+
+
