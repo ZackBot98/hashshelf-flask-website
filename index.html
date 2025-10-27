@@ -14,14 +14,7 @@
         <span class="logo">#</span>
         <span class="title">HashShelf</span>
       </div>
-      <div class="header-actions">
-        <label class="toggle">
-          <input type="checkbox" id="privacyToggle" />
-          <span>Privacy mode</span>
-        </label>
-        <button id="exportJsonBtn" class="secondary">Export JSON</button>
-        <button id="importJsonBtn" class="secondary">Import JSON</button>
-      </div>
+      <div class="header-actions"></div>
     </header>
 
     <main class="container">
@@ -114,7 +107,7 @@
 
       <section id="viewerView" class="view is-hidden">
         <div class="row between">
-          <h2>HashShelf</h2>
+          <h2 id="viewerTitle">HashShelf</h2>
           <a id="backToEditor" href="#" class="secondary link">Edit your list</a>
         </div>
         <div class="filters">
@@ -132,16 +125,7 @@
       </section>
     </main>
 
-    <dialog id="importDialog">
-      <form method="dialog" class="dialog">
-        <h3>Import JSON</h3>
-        <textarea id="importTextarea" rows="10" placeholder='{"v":1,"books":[...]}'></textarea>
-        <div class="row right">
-          <button value="cancel" class="secondary">Cancel</button>
-          <button id="confirmImportBtn" value="default" class="primary">Import</button>
-        </div>
-      </form>
-    </dialog>
+    
 
     <script>
       if ('serviceWorker' in navigator) {

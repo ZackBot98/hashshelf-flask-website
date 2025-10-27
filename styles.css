@@ -110,8 +110,8 @@ button:disabled { opacity: 0.6; cursor: default; }
 .notice.ok { background: #0f2319; border: 1px solid #1c3a2a; color: #c7f1da; }
 .is-hidden { display: none !important; }
 
-/* Hide header right actions (privacy + import/export) */
-.header-actions { display: none; }
+/* Header actions style */
+.header-actions { display: flex; gap: 8px; align-items: center; }
 
 /* Pretty back-to-editor control */
 #backToEditor { text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: #11131a; color: var(--text); box-shadow: var(--shadow-sm); transition: transform .05s ease, box-shadow .15s ease, border-color .15s ease, background .15s ease; }

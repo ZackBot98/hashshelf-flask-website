@@ -19,19 +19,16 @@
 
   const editorList = $('#editorList');
   const viewerList = $('#viewerList');
+  const viewerTitle = $('#viewerTitle');
 
   const createSnapshotBtn = $('#createSnapshotBtn');
   const snapshotOutput = $('#snapshotOutput');
   const snapshotLinkInput = $('#snapshotLink');
   const copyLinkBtn = $('#copyLinkBtn');
 
-  const exportJsonBtn = $('#exportJsonBtn');
-  const importJsonBtn = $('#importJsonBtn');
-  const importDialog = $('#importDialog');
-  const importTextarea = $('#importTextarea');
-  const confirmImportBtn = $('#confirmImportBtn');
+  
 
-  const privacyToggle = $('#privacyToggle');
+  const privacyToggle = null;
   const backToEditor = $('#backToEditor');
   const editorFilterSelect = $('#editorFilterSelect');
   const viewerFilterSelect = $('#viewerFilterSelect');
@@ -40,7 +37,7 @@
   const LS_NAME = 'displayName';
 
   const LS_BOOKS = 'booksDraft';
-  const LS_PRIVACY = 'privacyMode';
+  const LS_PRIVACY = null;
 
   let books = loadDraftBooks();
   let editIndex = null;
@@ -133,7 +130,7 @@
       editorList.appendChild(empty);
       return;
     }
-    const canHydrate = !privacyToggle.checked;
+    const canHydrate = true;
     const selectedVal = editorFilterSelect?.value || 'all';
     for (let i = 0; i < books.length; i++) {
       const b = books[i];
@@ -179,7 +176,7 @@
       editorList.appendChild(item);
 
       if (canHydrate) {
-        OpenLibrary.fetchBookMeta(b.idType, b.id, { privacyMode: false }).then((m) => {
+        OpenLibrary.fetchBookMeta(b.idType, b.id).then((m) => {
           title.textContent = m.title || title.textContent;
           authors.textContent = (m.authors && m.authors.join(', ')) || '';
           if (m.coverUrl) cover.src = m.coverUrl;
@@ -246,21 +243,29 @@
     return String(list[0]).replace(/[^0-9Xx]/g, '');
   }
 
-  function selectSuggestion(idx) {
+  async function selectSuggestion(idx) {
     const s = suggestions[idx];
     if (!s) return;
-    const bestIsbn = chooseBestIsbn(s);
-    if (bestIsbn) {
-      idTypeEl.value = 'isbn';
-      bookIdEl.value = bestIsbn;
-      bookIdEl.title = bestIsbn;
-    } else {
-      const workId = extractWorkIdFromKey(s.key);
-      if (!workId) return;
-      idTypeEl.value = 'work';
-      bookIdEl.value = workId;
-      bookIdEl.title = workId;
+    // Always resolve and store a Work ID, regardless of search mode
+    let workId = extractWorkIdFromKey(s.key);
+    if (!workId) {
+      const isbn = chooseBestIsbn(s);
+      if (isbn) {
+        try {
+          const res = await fetch(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`, { credentials: 'omit' });
+          if (res.ok) {
+            const ed = await res.json();
+            const wk = Array.isArray(ed?.works) && ed.works[0]?.key;
+            const resolved = wk && extractWorkIdFromKey(wk);
+            if (resolved) workId = resolved;
+          }
+        } catch {}
+      }
     }
+    if (!workId) return;
+    idTypeEl.value = 'work';
+    bookIdEl.value = workId;
+    bookIdEl.title = workId;
     // Show cover preview from suggestion or fetch if needed
     if (formCoverPreview) {
       const show = (url) => {
@@ -274,12 +279,8 @@
       };
       if (s.cover_i) {
         show(`https://covers.openlibrary.org/b/id/${s.cover_i}-M.jpg`);
-      } else if (!privacyToggle.checked) {
-        const t = idTypeEl.value;
-        const v = bookIdEl.value;
-        OpenLibrary.fetchBookMeta(t, v, { privacyMode: false }).then(m => show(m.coverUrl)).catch(() => show(''));
       } else {
-        show('');
+        OpenLibrary.fetchBookMeta('work', workId).then(m => show(m.coverUrl)).catch(() => show(''));
       }
     }
     clearSuggestions();
@@ -290,7 +291,6 @@
   function onSearchInput() {
     const q = titleSearchEl.value.trim();
     if (!q) { clearSuggestions(); return; }
-    if (privacyToggle.checked) { clearSuggestions(); return; }
     if (searchDebounce) clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
       try {
@@ -346,6 +346,12 @@
     statusEl.value = 'want';
     commentEl.value = '';
     addBookBtn.textContent = 'Add book';
+    if (titleSearchEl) titleSearchEl.value = '';
+    if (formCoverPreview) {
+      formCoverPreview.src = '';
+      formCoverPreview.classList.add('is-hidden');
+    }
+    clearSuggestions();
   }
 
   function addOrUpdateBook(e) {
@@ -396,37 +402,7 @@
     });
   }
 
-  function exportJson() {
-    const canonical = HashShelfSnapshot.canonicalSnapshot(books);
-    const blob = new Blob([JSON.stringify(canonical, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'hashshelf.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function openImport() {
-    importTextarea.value = '';
-    importDialog.showModal();
-  }
-
-  function doImport(e) {
-    e?.preventDefault?.();
-    try {
-      const data = JSON.parse(importTextarea.value);
-      if (!data || data.v !== HashShelfSnapshot.version || !Array.isArray(data.books)) throw new Error('Invalid JSON');
-      books = HashShelfSnapshot.canonicalizeBooks(data.books);
-      saveDraftBooks();
-      renderEditorList();
-      updateLiveHash();
-      importDialog.close();
-      showNotice('Imported JSON successfully.', 'ok');
-    } catch (err) {
-      showNotice('Import failed. Check JSON format.', 'error');
-    }
-  }
+  
 
   async function loadFromHashIfPresent() {
     const hash = location.hash;
@@ -436,6 +412,7 @@
     }
     try {
       const data = await HashShelfSnapshot.decodeFromHash(hash);
+      if (viewerTitle) viewerTitle.textContent = data?.name ? `${data.name}'s books` : 'HashShelf';
       await renderViewer(data.books);
       switchToViewer();
     } catch (err) {
@@ -458,10 +435,9 @@
 
   async function renderViewer(booksList) {
     viewerList.innerHTML = '';
-    const privacyMode = privacyToggle.checked;
     const selectedVal = viewerFilterSelect?.value || 'all';
     const filtered = selectedVal === 'all' ? booksList : booksList.filter(b => b.status === selectedVal);
-    const hydrated = await OpenLibrary.hydrateAll(filtered, { privacyMode });
+    const hydrated = await OpenLibrary.hydrateAll(filtered);
     for (const b of hydrated) {
       const item = document.createElement('div');
       item.className = 'book-item';
@@ -505,17 +481,8 @@
     clearFormBtn.addEventListener('click', clearForm);
     createSnapshotBtn.addEventListener('click', createSnapshot);
     copyLinkBtn.addEventListener('click', copyLink);
-    exportJsonBtn.addEventListener('click', exportJson);
-    importJsonBtn.addEventListener('click', openImport);
-    confirmImportBtn.addEventListener('click', doImport);
-    importDialog.addEventListener('close', () => importTextarea.value = '');
-    privacyToggle.addEventListener('change', () => {
-      savePrivacy(privacyToggle.checked);
-      renderEditorList();
-      if (privacyToggle.checked) clearSuggestions();
-      if (!editorView.classList.contains('is-hidden')) return;
-      loadFromHashIfPresent();
-    });
+    
+
     backToEditor.addEventListener('click', (e) => { e.preventDefault(); allowViewerFromHash = false; history.replaceState(null, '', `${location.origin}${location.pathname}`); switchToEditor(); });
     window.addEventListener('hashchange', () => { if (allowViewerFromHash) loadFromHashIfPresent(); });
 
@@ -525,7 +492,7 @@
   }
 
   function init() {
-    privacyToggle.checked = loadPrivacy();
+
     allowViewerFromHash = location.hash && location.hash.startsWith(HashShelfSnapshot.hashPrefix);
     try { const savedName = localStorage.getItem(LS_NAME); if (savedName && displayName) displayName.value = savedName; } catch {}
     renderEditorList();

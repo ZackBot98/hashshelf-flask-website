@@ -1,7 +1,8 @@
 /* global fflate */
 (function() {
   const VERSION = 1;
-  const HASH_PREFIX = `#v${VERSION}.`;
+  const NEW_HASH_PREFIX = `#`; // no visible version in URL
+  const OLD_HASH_PREFIX = `#v${VERSION}.`; // still accepted for backwards-compat decode
 
   const allowedIdTypes = new Set(["work", "isbn", "edition"]);
   const allowedStatuses = new Set(["want", "reading", "finished"]);
@@ -167,15 +168,17 @@
     const payload = base64UrlFromBytes(deflated);
     const digest = await sha256Hex(deflated);
     const integrity = digest.slice(0, 12);
-    const hash = `${HASH_PREFIX}${payload}.${integrity}`;
+    const hash = `${NEW_HASH_PREFIX}${payload}.${integrity}`;
     return hash;
   }
 
   async function decodeFromHash(hashStr) {
-    if (!hashStr || !hashStr.startsWith(HASH_PREFIX)) {
-      throw new Error("Missing or invalid version prefix");
+    if (!hashStr || !hashStr.startsWith('#')) {
+      throw new Error("Missing hash prefix");
     }
-    const remainder = hashStr.slice(HASH_PREFIX.length);
+    let remainder;
+    if (hashStr.startsWith(OLD_HASH_PREFIX)) remainder = hashStr.slice(OLD_HASH_PREFIX.length);
+    else remainder = hashStr.slice(NEW_HASH_PREFIX.length);
     const parts = remainder.split(".");
     if (parts.length !== 2) throw new Error("Malformed snapshot hash");
     const [payloadB64u, integrity] = parts;
@@ -211,7 +214,7 @@
     canonicalSnapshot,
     createSnapshotLink,
     version: VERSION,
-    hashPrefix: HASH_PREFIX
+    hashPrefix: NEW_HASH_PREFIX
   };
 })();
 

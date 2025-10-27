@@ -63,8 +63,7 @@
     return { title, authors, coverUrl: toCoverUrl(cover) };
   }
 
-  async function fetchBookMeta(idType, id, { privacyMode = false } = {}) {
-    if (privacyMode) return { title: `${idType.toUpperCase()}: ${id}`, authors: [], coverUrl: null };
+  async function fetchBookMeta(idType, id) {
     const key = cacheKey(idType, id);
     try {
       const raw = lsGet(key);

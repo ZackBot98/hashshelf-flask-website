@@ -31,7 +31,7 @@ A fully client‑side, hash‑driven book tracker. No accounts. No backend. A li
   - Keys inserted in fixed order; empty/undefined fields omitted; comments trimmed.
 - Payload = deflate (fflate) of the canonical JSON, base64‑url encoded
 - Integrity suffix = first 12 hex chars of SHA‑256(payload) (48‑bit)
-- Final link: `https://host/#v1.<payload>.<hash>`
+- Final link: `https://host/#<payload>.<hash>`
 
 ## Architecture
 
