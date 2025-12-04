@@ -202,7 +202,7 @@
     const meta = document.createElement('div');
     const t = document.createElement('div');
     t.className = 'suggestion-title';
-    t.textContent = s.title || 'Untitled';
+    t.textContent = s.title || s.title_suggest || 'Untitled';
     const a = document.createElement('div');
     a.className = 'suggestion-authors';
     a.textContent = Array.isArray(s.author_name) ? s.author_name.join(', ') : '';
@@ -222,6 +222,31 @@
       titleSuggestionsEl.appendChild(suggestionItemTemplate(suggestions[i], i));
     }
     titleSuggestionsEl.classList.remove('is-hidden');
+    enrichSuggestionTitles();
+  }
+
+  function enrichSuggestionTitles() {
+    const maxProbe = Math.min(5, suggestions.length);
+    for (let i = 0; i < maxProbe; i++) {
+      const s = suggestions[i];
+      if (!s || !s.key || s._enTitle) continue;
+      TitleSearch.fetchWorkEditions(s.key, { limit: 100 }).then((eds) => {
+        const enTitle = TitleSearch.pickEnglishEditionTitle(eds);
+        const enCoverId = TitleSearch.pickEnglishEditionCoverId(eds);
+        if (enTitle) {
+          s._enTitle = enTitle;
+          const item = titleSuggestionsEl.children[i];
+          const tEl = item && item.querySelector('.suggestion-title');
+          if (tEl && tEl.textContent !== enTitle) tEl.textContent = enTitle;
+        }
+        if (enCoverId) {
+          s._enCoverId = enCoverId;
+          const item = titleSuggestionsEl.children[i];
+          const imgEl = item && item.querySelector('.suggestion-cover');
+          if (imgEl) imgEl.src = `https://covers.openlibrary.org/b/id/${enCoverId}-S.jpg`;
+        }
+      }).catch(() => {});
+    }
   }
 
   function extractWorkIdFromKey(key) {
@@ -277,14 +302,16 @@
           formCoverPreview.classList.add('is-hidden');
         }
       };
-      if (s.cover_i) {
+      if (s._enCoverId) {
+        show(`https://covers.openlibrary.org/b/id/${s._enCoverId}-M.jpg`);
+      } else if (s.cover_i) {
         show(`https://covers.openlibrary.org/b/id/${s.cover_i}-M.jpg`);
       } else {
         OpenLibrary.fetchBookMeta('work', workId).then(m => show(m.coverUrl)).catch(() => show(''));
       }
     }
     clearSuggestions();
-    titleSearchEl.value = s.title || titleSearchEl.value;
+    titleSearchEl.value = s._enTitle || s.title || s.title_suggest || titleSearchEl.value;
     showNotice('Filled form from search. Adjust fields, then Add book.', 'ok');
   }
 
@@ -294,12 +321,9 @@
     if (searchDebounce) clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
       try {
-        const url = `https://openlibrary.org/search.json?title=${encodeURIComponent(q)}&limit=10&fields=key,title,author_name,cover_i,isbn`;
-        const res = await fetch(url, { credentials: 'omit' });
-        if (!res.ok) throw new Error('search failed');
-        const data = await res.json();
-        const docs = Array.isArray(data?.docs) ? data.docs : [];
-        suggestions = docs.filter(d => d.key && d.title).slice(0, 10);
+        const data = await TitleSearch.searchByQuery(q, { limit: 10, mode: 'everything' });
+        const docs = TitleSearch.filterSuggestionDocs(TitleSearch.extractDocs(data), { limit: 10 });
+        suggestions = docs;
         activeSuggestion = -1;
         renderSuggestions();
       } catch {

@@ -41,11 +41,48 @@
     return `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
   }
 
+  async function fetchWorkEditionsSimple(id, { limit = 200, offset = 0 } = {}) {
+    const params = new URLSearchParams();
+    if (limit != null) params.set("limit", String(limit));
+    if (offset) params.set("offset", String(offset));
+    const url = `https://openlibrary.org/works/${encodeURIComponent(id)}/editions.json?${params.toString()}`;
+    const data = await fetchJson(url);
+    const entries = Array.isArray(data?.entries) ? data.entries : [];
+    return entries;
+  }
+
+  function isEnglishLanguageEntry(langEntry) {
+    if (!langEntry) return false;
+    const key = langEntry?.key || '';
+    return String(key).toLowerCase().includes('/languages/eng');
+  }
+
+  function findEnglishEdition(editions) {
+    const list = Array.isArray(editions) ? editions : [];
+    return list.find((ed) => {
+      const langs = ed?.languages;
+      if (!langs) return false;
+      if (Array.isArray(langs)) return langs.some(isEnglishLanguageEntry);
+      return false;
+    }) || null;
+  }
+
   async function hydrateWork(id) {
     const data = await fetchJson(`https://openlibrary.org/works/${encodeURIComponent(id)}.json`);
-    const title = data?.title || `Work ${id}`;
+    let title = data?.title || `Work ${id}`;
     const authors = await fetchAuthorNames(data?.authors);
-    const cover = Array.isArray(data?.covers) ? data.covers[0] : null;
+    let cover = Array.isArray(data?.covers) ? data.covers[0] : null;
+
+    try {
+      const editions = await fetchWorkEditionsSimple(id, { limit: 200 });
+      const engEd = findEnglishEdition(editions);
+      if (engEd) {
+        if (engEd.title) title = engEd.title;
+        const edCovers = Array.isArray(engEd.covers) ? engEd.covers : [];
+        if (edCovers.length) cover = edCovers[0];
+      }
+    } catch {}
+
     return { title, authors, coverUrl: toCoverUrl(cover) };
   }
 
