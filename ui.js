@@ -2,6 +2,54 @@
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
+  // Open Library helpers (no external TitleSearch needed)
+  async function olSearch(query, { limit = 10, mode = 'everything' } = {}) {
+    const params = new URLSearchParams();
+    params.set('q', String(query || '').trim());
+    params.set('limit', String(limit));
+    params.set('mode', String(mode));
+    params.set('fields', 'key,title,title_suggest,author_name,cover_i,isbn,language,work_key,edition_key');
+    const url = `https://openlibrary.org/search.json?${params.toString()}`;
+    const res = await fetch(url, { credentials: 'omit' });
+    if (!res.ok) throw new Error('search failed');
+    const data = await res.json();
+    const docs = Array.isArray(data?.docs) ? data.docs : [];
+    return docs.filter(d => d && d.key && (d.title || d.title_suggest)).slice(0, limit);
+  }
+
+  async function olFetchWorkEditions(workKey, { limit = 100, offset = 0 } = {}) {
+    const key = String(workKey || '').replace(/^\/works\//, '');
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    if (offset) params.set('offset', String(offset));
+    const url = `https://openlibrary.org/works/${encodeURIComponent(key)}/editions.json?${params.toString()}`;
+    const res = await fetch(url, { credentials: 'omit' });
+    if (!res.ok) throw new Error('editions failed');
+    const data = await res.json();
+    return Array.isArray(data?.entries) ? data.entries : [];
+  }
+
+  function isEnglishEdition(ed) {
+    const langs = ed?.languages;
+    if (!langs) return false;
+    if (!Array.isArray(langs)) return false;
+    return langs.some(l => String(l?.key || '').toLowerCase().includes('/languages/eng'));
+    }
+
+  function pickEnglishEditionTitle(editions) {
+    const list = Array.isArray(editions) ? editions : [];
+    const eng = list.find(isEnglishEdition);
+    return eng?.title || null;
+  }
+
+  function pickEnglishEditionCoverId(editions) {
+    const list = Array.isArray(editions) ? editions : [];
+    const eng = list.find(isEnglishEdition);
+    if (!eng) return null;
+    const covers = Array.isArray(eng.covers) ? eng.covers : [];
+    return covers.length ? covers[0] : null;
+  }
+
   const editorView = $('#editorView');
   const viewerView = $('#viewerView');
   const noticeEl = $('#notice');
@@ -230,9 +278,9 @@
     for (let i = 0; i < maxProbe; i++) {
       const s = suggestions[i];
       if (!s || !s.key || s._enTitle) continue;
-      TitleSearch.fetchWorkEditions(s.key, { limit: 100 }).then((eds) => {
-        const enTitle = TitleSearch.pickEnglishEditionTitle(eds);
-        const enCoverId = TitleSearch.pickEnglishEditionCoverId(eds);
+      olFetchWorkEditions(s.key, { limit: 100 }).then((eds) => {
+        const enTitle = pickEnglishEditionTitle(eds);
+        const enCoverId = pickEnglishEditionCoverId(eds);
         if (enTitle) {
           s._enTitle = enTitle;
           const item = titleSuggestionsEl.children[i];
@@ -321,9 +369,7 @@
     if (searchDebounce) clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
       try {
-        const data = await TitleSearch.searchByQuery(q, { limit: 10, mode: 'everything' });
-        const docs = TitleSearch.filterSuggestionDocs(TitleSearch.extractDocs(data), { limit: 10 });
-        suggestions = docs;
+        suggestions = await olSearch(q, { limit: 10, mode: 'everything' });
         activeSuggestion = -1;
         renderSuggestions();
       } catch {
@@ -359,6 +405,25 @@
     statusEl.value = b.status;
     commentEl.value = b.comment || '';
     addBookBtn.textContent = 'Update book';
+    // Hydrate title into the search box and show current cover
+    try {
+      OpenLibrary.fetchBookMeta(b.idType, b.id).then((m) => {
+        if (titleSearchEl && (m?.title || titleSearchEl.value === '')) {
+          titleSearchEl.value = m?.title || titleSearchEl.value;
+        }
+        if (formCoverPreview) {
+          if (m?.coverUrl) {
+            formCoverPreview.src = m.coverUrl;
+            formCoverPreview.classList.remove('is-hidden');
+          } else {
+            formCoverPreview.src = '';
+            formCoverPreview.classList.add('is-hidden');
+          }
+        }
+      }).catch(() => {});
+    } catch {}
+    // Scroll to the top for editing
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }
 
   function clearForm() {
