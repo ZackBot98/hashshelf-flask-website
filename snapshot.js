@@ -5,7 +5,7 @@
   const OLD_HASH_PREFIX = `#v${VERSION}.`; // still accepted for backwards-compat decode
 
   const allowedIdTypes = new Set(["work", "isbn", "edition"]);
-  const allowedStatuses = new Set(["want", "reading", "finished"]);
+  const allowedStatuses = new Set(["want", "reading", "finished", "did not finish"]);
 
   function clampRating(value) {
     if (value === null || value === undefined || value === "") return undefined;
