@@ -14,8 +14,15 @@
     return Math.max(0, Math.min(5, Math.round(n)));
   }
 
+  // Locale-independent code-unit compare: canonical byte output must not
+  // depend on the device's collation rules.
+  function codeUnitCompare(a, b) {
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
   function canonicalizeBooks(books) {
-    const normalized = [];
+    // Keep-last dedupe per (idType, id): re-adding a book updates it
+    const byKey = new Map();
     for (const b of books || []) {
       const idType = String(b.idType || "").trim().toLowerCase();
       const id = String(b.id || "").trim();
@@ -33,11 +40,12 @@
         ...(comment ? { comment } : {}),
         status
       };
-      normalized.push(book);
+      byKey.set(`${idType}:${id}`, book);
     }
 
     // Sort by id asc, tiebreaker idType for determinism across mixed types
-    normalized.sort((a, b) => a.id.localeCompare(b.id) || a.idType.localeCompare(b.idType));
+    const normalized = Array.from(byKey.values());
+    normalized.sort((a, b) => codeUnitCompare(a.id, b.id) || codeUnitCompare(a.idType, b.idType));
     return normalized;
   }
 
@@ -202,17 +210,11 @@
     return data;
   }
 
-  async function createSnapshotLink(books, name) {
-    const hash = await encodeSnapshot(books, name);
-    return `${location.origin}/${hash}`;
-  }
-
   window.HashShelfSnapshot = {
     encodeSnapshot,
     decodeFromHash,
     canonicalizeBooks,
     canonicalSnapshot,
-    createSnapshotLink,
     version: VERSION,
     hashPrefix: NEW_HASH_PREFIX
   };

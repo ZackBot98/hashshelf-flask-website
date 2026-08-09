@@ -4,9 +4,18 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>HashShelf — Link-based book tracker</title>
-    <meta name="description" content="A fully client-side, hash-driven book tracker." />
+    <meta name="description" content="Track and share your books with a single link. No accounts, no signup — the link is the data." />
+    <meta property="og:title" content="HashShelf — Link-based book tracker" />
+    <meta property="og:description" content="Track and share your books with a single link. No accounts, no signup — the link is the data." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hashshelf.com/" />
+    <meta property="og:image" content="https://hashshelf.com/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="theme-color" content="#0b0c0f" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='0.9em' font-size='90'%3E%23%3C/text%3E%3C/svg%3E" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <header class="app-header">
@@ -22,10 +31,21 @@
 
       <section id="editorView" class="view">
         <h2 id="listTitle">Your books</h2>
-        <label class="name-label">
-          Name
-          <input id="displayName" type="text" placeholder="Your name" />
-        </label>
+        <div class="shelf-bar">
+          <label class="grow">
+            Shelf
+            <select id="shelfSelect"></select>
+          </label>
+          <label class="grow">
+            Name (shown on shared links)
+            <input id="displayName" type="text" placeholder="Your name" />
+          </label>
+          <div class="shelf-actions">
+            <button id="newShelfBtn" class="secondary" type="button">New</button>
+            <button id="renameShelfBtn" class="secondary" type="button">Rename</button>
+            <button id="deleteShelfBtn" class="secondary" type="button">Delete</button>
+          </div>
+        </div>
         <form id="bookForm" class="card book-form">
           <div class="form-main">
             <label>
@@ -84,6 +104,13 @@
           </aside>
         </form>
 
+        <div class="tools-row">
+          <button id="importCsvBtn" class="secondary" type="button">Import Goodreads CSV</button>
+          <input id="csvFileInput" type="file" accept=".csv,text/csv" class="is-hidden" />
+          <button id="compareBtn" class="secondary" type="button">Compare shelves</button>
+          <button id="wrappedBtn" class="secondary" type="button">Year in review</button>
+        </div>
+
         <div class="filters">
           <label class="grow">
             Status
@@ -93,6 +120,12 @@
               <option value="reading">reading</option>
               <option value="finished">read</option>
               <option value="did not finish">did not finish</option>
+            </select>
+          </label>
+          <label class="grow">
+            Genre
+            <select id="editorGenreSelect" class="select-filter">
+              <option value="all" selected>all</option>
             </select>
           </label>
         </div>
@@ -110,7 +143,11 @@
       <section id="viewerView" class="view is-hidden">
         <div class="row between">
           <h2 id="viewerTitle">HashShelf</h2>
-          <a id="backToEditor" href="#" class="secondary link">Edit your list</a>
+          <div class="row">
+            <button id="importShelfBtn" class="secondary" type="button">Copy to my shelf</button>
+            <button id="compareWithMineBtn" class="secondary" type="button">Compare with mine</button>
+            <a id="backToEditor" href="#" class="secondary link">Edit your list</a>
+          </div>
         </div>
         <div class="filters">
           <label class="grow">
@@ -126,22 +163,52 @@
         </div>
         <div id="viewerList" class="list"></div>
       </section>
+
+      <section id="compareView" class="view is-hidden">
+        <div class="row between">
+          <h2>Compare shelves</h2>
+          <a id="compareBack" href="#" class="secondary link">Back to my list</a>
+        </div>
+        <div class="card compare-form">
+          <label>
+            Their HashShelf link
+            <input id="compareLink" type="text" placeholder="https://hashshelf.com/s/… or a #… link" />
+          </label>
+          <button id="compareRunBtn" class="primary" type="button">Compare</button>
+        </div>
+        <div id="compareResults"></div>
+      </section>
     </main>
+
+    <div id="wrappedModal" class="modal is-hidden">
+      <div class="modal-inner">
+        <div class="row between">
+          <h3>Year in review</h3>
+          <button id="wrappedClose" class="secondary" type="button">Close</button>
+        </div>
+        <div id="wrappedCanvasWrap" class="wrapped-canvas"></div>
+        <div class="row">
+          <button id="wrappedDownload" class="primary" type="button">Download PNG</button>
+          <button id="wrappedShare" class="secondary is-hidden" type="button">Share</button>
+        </div>
+      </div>
+    </div>
 
     
 
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+          navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
         });
       }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
-    <script src="./snapshot.js"></script>
-    <script src="./openlibrary.js"></script>
-    <script src="./ui.js"></script>
+    <script src="/vendor/fflate.min.js"></script>
+    <script src="/lib.js"></script>
+    <script src="/snapshot.js"></script>
+    <script src="/openlibrary.js"></script>
+    <script src="/ui.js"></script>
   </body>
-  </html>
+</html>
 
 

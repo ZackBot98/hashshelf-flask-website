@@ -1,136 +1,128 @@
 # HashShelf
 
-A fully client‑side, hash‑driven book tracker. No accounts. No backend. A link is the data.
+A hash-driven book tracker. No accounts. A link is the data.
+
+Live at [hashshelf.com](https://hashshelf.com).
 
 ## What it does
 
-- Add books by OpenLibrary Work ID (e.g. `OL45883W`) or ISBN.
-- Set rating (0–5), status (want/reading/read), and an optional comment.
-- Hydrate titles/authors/covers from OpenLibrary, cached for 7 days (localStorage + Service Worker).
-- Live snapshot: the URL hash updates as you edit. Click “Create HashShelf” to copy the link.
-- Open any snapshot link to reconstruct the list deterministically.
-- Optional name/title shown as “<name>’s books” (stored locally and in the hash).
-- Works offline after first load.
+- Add books by OpenLibrary Work ID (e.g. `OL45804W`) or ISBN, or search by title.
+- Set rating (0–5), status (`want` / `reading` / `finished` / `did not finish`), and an optional comment.
+- Hydrate titles/authors/covers/genres from OpenLibrary — via the HashShelf API cache when available, directly from OpenLibrary otherwise.
+- **Multiple shelves**, switched locally; each shares as its own link.
+- **Goodreads CSV import**: drop in a `goodreads_library_export.csv` and the shelf fills in. Maps Goodreads' shelves to statuses, keeps ratings and reviews, and reports rows it had to skip (no ISBN).
+- **Compare shelves**: paste someone's link to see overlap, books only they have, and where your ratings disagree most — then add their books to your want list in one click.
+- **Year in review**: a shareable PNG card (covers, counts, top authors/genres, rating distribution), rendered entirely client-side.
+- Filter by status **and genre**; genres are derived from OpenLibrary subjects, not stored in the link.
+- Live snapshot: the URL hash updates as you edit. "Create HashShelf" copies a shareable link (a short `/s/<slug>` link with a proper social preview when the backend is up, the full hash link otherwise).
+- Open any snapshot link to reconstruct the list deterministically. "Copy to my shelf" imports someone else's shelf into your own.
+- Optional name shown as "\<name\>'s books" (stored locally and in the hash).
+- Installable PWA; works offline after first load.
+
+## Design invariant
+
+**The URL hash is the source of truth.** The full hash link is always a complete, self-contained copy of the shelf. Everything server-side is either a cache of OpenLibrary (disposable) or a copy of a snapshot that also lives in its long link. Losing the backend never loses data, and the app still works served as plain static files.
 
 ## Snapshot format
 
-- Canonical JSON (deterministic ordering/whitespace):
+Canonical JSON (deterministic ordering/whitespace):
 
 ```json
 {
   "v": 1,
   "name": "optional string",
   "books": [
-    { "idType": "work"|"edition"|"isbn", "id": "string", "rating": 0, "comment": "string", "status": "want|reading|finished" }
+    { "idType": "work|edition|isbn", "id": "string", "rating": 0, "comment": "string", "status": "want|reading|finished|did not finish" }
   ]
 }
 ```
 
-- Canonicalization rules:
-  - `books` normalized and sorted by `id` asc (tie‑break by `idType`).
-  - Keys inserted in fixed order; empty/undefined fields omitted; comments trimmed.
-- Payload = deflate (fflate) of the canonical JSON, base64‑url encoded
-- Integrity suffix = first 12 hex chars of SHA‑256(payload) (48‑bit)
-- Final link: `https://host/#<payload>.<hash>`
+Canonicalization rules:
+
+- `books` normalized, deduped per `(idType, id)` (last write wins), and sorted by `id` asc (tie-break `idType`), using locale-independent code-unit comparison.
+- Keys inserted in fixed order; empty/undefined fields omitted; comments trimmed.
+
+Encoding:
+
+- Payload = raw deflate (fflate, vendored) of the canonical JSON, base64-url encoded.
+- Integrity suffix = first 12 hex chars of SHA-256 over the **deflated bytes** (48-bit). This detects corruption/truncation of shared links; it is a checksum, not authentication.
+- Final link: `https://hashshelf.com/#<payload>.<hash>`
+- Short link: `https://hashshelf.com/s/<slug>` where `slug` is a prefix of the SHA-256 digest — snapshots are content-addressed, so the same shelf always yields the same short link.
 
 ## Architecture
 
-- 100% client‑side. No writes to any network. All state lives in:
-  - URL hash (shareable, deterministic snapshot)
-  - `localStorage` (draft edits, hydration cache, name, UI state)
-  - Service Worker cache (assets + API responses with TTL)
-- Hashing: baseline JS SHA‑256 (no secure‑context requirement). Integrity still 48‑bit.
-- Compression: fflate
+```
+index.html         SPA shell (editor + viewer + compare + wrapped modal)
+styles.css         Dark theme + layout
+snapshot.js        Canonicalize + deflate + base64url + SHA-256 integrity
+openlibrary.js     Metadata hydration: API-first with direct-OpenLibrary fallback
+lib.js             Pure logic: CSV import, genre mapping, compare, wrapped card
+ui.js              Rendering, events, shelves, filters, clipboard, live hash
+genres.json        Genre rules, shared by server.py and lib.js
+service-worker.js  Asset + API cache (7d TTL), offline support
+vendor/fflate.min.js  Vendored fflate 0.8.2 (hash-verified against npm)
+server.py          Flask: static serving + API + short links + OG tags
+render.yaml        Render blueprint
+tests/             Unit tests (2 Node suites + hermetic Python server suite)
+TESTING.md         Test plan: automated suites, manual matrix, release checklist
+```
 
-## Hydration (OpenLibrary)
+Run tests from the repo root:
 
-- Work JSON: `https://openlibrary.org/works/<id>.json`
-- ISBN/Edition JSON: first `https://openlibrary.org/isbn/<isbn>.json`, fallback `https://openlibrary.org/books/<id>.json`
-- Covers: `https://covers.openlibrary.org/b/id/<coverId>-M.jpg`
-- Caching:
-  - `localStorage` key `bookCache:<idType>:<id>` with 7‑day TTL
-  - Service Worker: cache‑first with 7‑day TTL for OpenLibrary and cover domains; serves stale on errors
+```bash
+node tests/test-snapshot.js
+node tests/test-lib.js
+python -m unittest discover tests
+```
 
-## UI Overview
+Client state lives in the URL hash (shareable snapshot), `localStorage` (shelves, hydration cache, name, own-link set), and the Service Worker cache. Shelves are stored under `shelves:v1`; a pre-v1.3 single `booksDraft` is migrated automatically on first load.
 
-- Editor
-  - Title + Name (optional). If blank, shows “Your books”.
-  - Search by title (OpenLibrary Search suggestions). Selecting fills Work/ISBN and shows cover.
-  - Fields: ID Type, ID, Rating, Status, Comment; cover preview on the right.
-  - Status filter dropdown (All/Want/Reading/Read) above the list.
-  - “Create HashShelf” copies the current link to clipboard, with robust fallbacks (execCommand, Web Share).
-- Viewer
-  - Renders a decoded snapshot; hydrates metadata (cached). Filter available.
+### Genres
+
+OpenLibrary subjects are messy free text ("Fiction, science fiction, general", "nyt:bestseller", "Science-fiction"). `genres.json` maps them to a small display set and is the **single source of truth**, loaded by both the server and the browser. Matching is punctuation-insensitive, each subject counts toward at most one genre, and rules run specific-before-general so "Science fiction" never also counts as "Science". Genres are hydration metadata — they never enter the snapshot, so links stay compact.
+
+### API (all optional — the client falls back to OpenLibrary directly)
+
+- `POST /api/books` — bulk hydration: `{books: [{idType, id}]}` → assembled `{title, authors, coverUrl, genres, workId}` per book. SQLite-cached (60d TTL), so OpenLibrary is hit at most once per book per TTL across *all* users. The client batches same-tick requests, so rendering a whole shelf is one round trip.
+- `GET /api/search?q=` — cached OpenLibrary search (24h TTL) with English-edition title/cover enrichment done server-side.
+- `POST /api/snapshot` — validates a snapshot payload (integrity, deflate, schema) and stores it content-addressed; returns the short-link slug.
+- `GET /api/snapshot/<slug>` — resolves a short link back to its payload (used by Compare).
+- `GET /s/<slug>` — serves the app with per-shelf OpenGraph tags (link unfurls!) and the snapshot inlined.
+
+Failures are never cached, stale data is served in preference to errors, upstream calls are rate-limited with a global token bucket and retried with backoff on 429/5xx, and concurrent identical hydrations are deduped. `workId` is what lets Compare match the same book added by ISBN on one shelf and by work ID on another.
+
+Known rough edge: a large cold import can still see a few books fail hydration when OpenLibrary throttles. Those failures are never cached, the client falls back to calling OpenLibrary directly, and a later view fills them in.
 
 ## Develop locally
 
-- Python
-
 ```bash
-python -m http.server 5173
+pip install -r requirements.txt
+python server.py
 ```
 
-- Node
+Open `http://localhost:8000`. For phone testing on your LAN, use `http://<your-LAN-IP>:8000` (the app is designed to work on plain HTTP: portable SHA-256, clipboard fallbacks; the service worker itself requires HTTPS or localhost).
 
-```bash
-npx http-server -p 5173
-# or
-npx serve -l 5173
-```
-
-Open `http://localhost:5173`.
-
-Notes:
-- On plain HTTP over LAN, everything works (baseline SHA‑256 and copy fallbacks are included). For the best clipboard and PWA behavior on mobile, serve over HTTPS.
+Static-only development still works too (`python -m http.server 5173` from the repo root) — the client just uses the direct OpenLibrary path.
 
 ## Deploy
 
-### Cloudflare Pages (no build)
+### Render (current target)
 
-- Push to GitHub
-- Cloudflare Pages → Create Project → Connect repo
-- Framework preset: None
-- Build command: (leave blank)
-- Output directory: `/`
-- Alternatively, drag‑and‑drop the folder
+The repo contains a `render.yaml` blueprint: Render → New → Blueprint → connect the repo. It runs `gunicorn` serving `server:app`.
 
-Optional headers for better caching (create a `_headers` file at repo root):
+- **Free plan:** spins down after ~15 min idle (the client's fallback path covers cold starts); filesystem is ephemeral, so the metadata cache rebuilds on restart — fine — but **short links do not survive restarts**. Upgrade to a paid instance + attach the disk in `render.yaml` before treating short links as permanent.
+- Point `hashshelf.com` at the Render service (add the custom domain in Render, update the DNS record in Cloudflare, keep the proxy on for CDN caching). Bump `CACHE_NAME` in `service-worker.js` on deploys that change assets.
 
-```
-/service-worker.js
-  Cache-Control: no-cache
+### Static hosting (Cloudflare Pages, GitHub Pages, Netlify…)
 
-/*.css
-  Cache-Control: public, max-age=31536000, immutable
-
-/*.js
-  Cache-Control: public, max-age=31536000, immutable
-```
-
-### GitHub Pages / Netlify / Vercel
-
-- It’s a static site; publish the root directory as is. Hash routing needs no rewrites.
-
-## Project structure
-
-```
-index.html        # SPA shell
-styles.css        # Dark theme + layout
-snapshot.js       # Canonicalize + deflate + base64url + SHA‑256 integrity
-openlibrary.js    # Hydration + 7d caching
-ui.js             # Rendering, events, filters, clipboard, live hash
-service-worker.js # Asset + API cache (7d TTL), offline support
-```
+Still fully supported — publish the repo root as-is. Everything works except short links and per-shelf link previews (the client hydrates straight from OpenLibrary).
 
 ## Security & privacy
 
-- Snapshots are deterministic, integrity‑checked (48‑bit suffix), and shareable via URL hash.
-- No backend writes. Hydration fetches are GETs to OpenLibrary. Snapshot data itself never leaves the browser except via the link you share.
-
-## Accessibility & mobile
-
-- Inputs use ≥16px font to avoid iOS auto‑zoom.
-- Copy flow has fallbacks for older/locked‑down browsers (execCommand/Web Share).
+- Snapshots are deterministic and integrity-checked (corruption detection, not authentication — anyone can mint a valid link).
+- Shelf data leaves the browser only via links you share, or when you explicitly mint a short link (which stores that snapshot server-side).
+- The server stores no user identity: no accounts, no cookies, and nothing in the database ties data to a person. Short links are content-addressed blobs. (The hosting layer's standard access logs exist, as with any web host.)
+- All rendering uses `textContent` — comments from shared links cannot inject HTML.
 
 ## License
 

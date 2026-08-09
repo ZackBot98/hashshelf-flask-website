@@ -1,19 +1,33 @@
-const CACHE_NAME = 'hashshelf-cache-v39';
+const CACHE_NAME = 'hashshelf-cache-v41';
 const API_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './snapshot.js',
-  './openlibrary.js',
-  './ui.js',
-  'https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js'
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/snapshot.js',
+  '/openlibrary.js',
+  '/lib.js',
+  '/ui.js',
+  '/manifest.json',
+  '/genres.json',
+  '/vendor/fflate.min.js',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
+
+// Opaque responses (no-cors image loads) report status 0 and must be assumed
+// good; for everything else only cache real successes so an upstream error
+// can never get pinned in cache for a week.
+function cacheable(res) {
+  return res && (res.ok || res.type === 'opaque');
+}
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(ASSETS);
+    // no-cache: bypass the HTTP cache so a new SW version never precaches
+    // stale copies of assets that were fetched under an old max-age
+    await cache.addAll(ASSETS.map(u => new Request(u, { cache: 'no-cache' })));
     self.skipWaiting();
   })());
 });
@@ -28,17 +42,30 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  if (req.method !== 'GET') return; // POST /api/* etc. go straight to network
+
+  const url = new URL(req.url);
+
+  // Never cache-first the API itself (besides search, handled below):
+  // freshness beats offline for dynamic endpoints.
+  const isSearch = url.origin === self.location.origin && url.pathname === '/api/search';
+  const isOtherApi = url.origin === self.location.origin && !isSearch && url.pathname.startsWith('/api/');
+  if (isOtherApi) return;
+
+  const isOpenLibrary =
+    url.hostname.endsWith('openlibrary.org') || url.hostname.endsWith('covers.openlibrary.org');
+
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
-    const url = new URL(req.url);
 
-    // Cache-first with TTL for OpenLibrary APIs and covers
-    const isOpenLibrary = req.method === 'GET' && (
-      url.hostname.endsWith('openlibrary.org') || url.hostname.endsWith('covers.openlibrary.org')
-    );
-    if (isOpenLibrary) {
+    // Cache-first with TTL for OpenLibrary + our search proxy; stale on error
+    if (isOpenLibrary || isSearch) {
       const metaKey = req.url + '::meta';
-      const cached = await cache.match(req);
+      let cached = await cache.match(req);
+      // An opaque response (stored from a no-cors <img> load) cannot satisfy a
+      // CORS request — the wrapped card reads cover pixels and would fail.
+      // Refetch instead, which also upgrades the entry to a usable CORS copy.
+      if (cached && cached.type === 'opaque' && req.mode === 'cors') cached = undefined;
       const metaRes = await cache.match(metaKey);
       let cachedAt = 0;
       if (metaRes) {
@@ -48,29 +75,35 @@ self.addEventListener('fetch', (event) => {
       if (fresh) return cached;
       try {
         const res = await fetch(req, { cache: 'no-cache' });
-        await cache.put(req, res.clone());
-        await cache.put(new Request(metaKey), new Response(JSON.stringify({ cachedAt: Date.now() }), { headers: { 'content-type': 'application/json' } }));
+        if (cacheable(res)) {
+          await cache.put(req, res.clone());
+          await cache.put(
+            new Request(metaKey),
+            new Response(JSON.stringify({ cachedAt: Date.now() }), { headers: { 'content-type': 'application/json' } })
+          );
+        }
         return res;
       } catch (err) {
         if (cached) return cached; // serve stale on failure
         throw err;
       }
     }
+
+    // App shell + same-origin assets: cache-first, fill from network
     const cached = await cache.match(req);
     if (cached) return cached;
     try {
       const res = await fetch(req, { cache: 'no-cache' });
-      if (req.method === 'GET' && (req.url.startsWith(self.location.origin) || req.url.includes('cdn.jsdelivr.net'))) {
+      if (url.origin === self.location.origin && cacheable(res) && !url.pathname.startsWith('/s/')) {
         cache.put(req, res.clone());
       }
       return res;
     } catch (err) {
       if (req.destination === 'document') {
-        return cache.match('./index.html');
+        const shell = await cache.match('/index.html');
+        if (shell) return shell;
       }
       throw err;
     }
   })());
 });
-
-
