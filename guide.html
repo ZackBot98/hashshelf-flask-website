@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Guide — HashShelf</title>
+    <meta name="description" content="How to use HashShelf: add books, keep shelves, share links, import from Goodreads, compare with friends, and make a year-in-review card." />
+    <meta property="og:title" content="HashShelf Guide" />
+    <meta property="og:description" content="Everything the link-based book tracker can do, in one page." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hashshelf.com/guide.html" />
+    <meta name="theme-color" content="#fcfbf8" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cstyle%3E.i%7Bfill:%23191817%7D@media(prefers-color-scheme:dark)%7B.i%7Bfill:%23e9e5dc%7D%7D%3C/style%3E%3Crect class='i' x='21' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='38' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='8' y='25' width='48' height='4.5' rx='1.5'/%3E%3Crect class='i' x='8' y='42' width='48' height='4.5' rx='1.5'/%3E%3Crect x='29' y='14' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3Crect x='12' y='16' width='4' height='9' rx='1' fill='%23c23b22'/%3E%3Crect x='47' y='31' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .guide { max-width: 640px; margin: 0 auto; padding: 8px 20px 72px; }
+      .guide h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 34px 0 6px; }
+      .guide .kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+      .guide .lede { font-family: var(--serif); font-size: 17px; line-height: 1.65; color: var(--muted); margin: 0 0 8px; }
+      .guide h2 {
+        font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; font-family: var(--mono);
+        margin: 38px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+      }
+      .guide h2 .no { color: var(--red); margin-right: 10px; }
+      .guide p { font-family: var(--serif); font-size: 16.5px; line-height: 1.62; margin: 0 0 12px; }
+      .guide p code, .guide li code { font-family: var(--mono); font-size: 13.5px; }
+      .guide ul { margin: 0 0 12px; padding-left: 20px; }
+      .guide li { font-family: var(--serif); font-size: 16.5px; line-height: 1.55; margin: 4px 0; }
+      .tip {
+        font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: var(--muted);
+        border-left: 2px solid var(--red); padding: 2px 0 2px 12px; margin: 0 0 12px;
+      }
+      .tip strong { color: var(--ink); font-weight: 600; letter-spacing: .06em; }
+      .backlink { display: inline-block; margin-top: 30px; }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="/" style="text-decoration:none;color:inherit">
+        <svg class="logo-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <rect x="21" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="38" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="25" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="42" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="29" y="14" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="12" y="16" width="4" height="9" rx="1" fill="#c23b22"/>
+          <rect x="47" y="31" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="29.5" y="33" width="4" height="9" rx="1" fill="#c23b22" transform="rotate(8 31.5 37)"/>
+        </svg>
+        <span class="title">HashShelf</span>
+      </a>
+      <div class="header-actions"><a class="link" href="/">Your shelf</a> <a class="link" href="/about.html">About</a></div>
+    </header>
+
+    <main class="guide">
+      <div class="kicker">Guide</div>
+      <h1>Everything HashShelf does.</h1>
+      <p class="lede">Five minutes, the whole manual. The one idea underneath it all:
+      your shelf is a link, and the link is the data.</p>
+
+      <h2><span class="no">01</span>Add books</h2>
+      <p>Type a title into the search box — it searches as you type and shows matches
+      with covers. Pick one and the form fills itself. Set a rating (0–5), a status
+      (<code>want</code>, <code>reading</code>, <code>finished</code>,
+      <code>did not finish</code>), an optional note, then <strong>Add book</strong>.</p>
+      <p>You can also add directly by ISBN (the number on a book's barcode) or an
+      Open Library work ID — useful when search can't find an obscure edition.</p>
+      <div class="tip"><strong>TIP</strong> — Adding a book that's already on the shelf
+      updates it instead of duplicating it. Arrow keys and Enter work in the search
+      results; Escape dismisses them.</div>
+
+      <h2><span class="no">02</span>Shelves</h2>
+      <p>You can keep several lists — a to-read pile, a finished log, a book-club
+      list. Switch, create, rename, and delete them from the shelf bar.</p>
+      <p><strong>The shelf's name is the title people see</strong> when you share it:
+      the page heading, the link preview, the year-in-review card. Renaming a shelf
+      changes its link, since the name travels inside it.</p>
+
+      <h2><span class="no">03</span>Share a shelf</h2>
+      <p>The address bar updates as you edit — that long link after the <code>#</code>
+      <em>is</em> your shelf, compressed. Hit <strong>Create HashShelf</strong> to copy
+      a clean short link that unfurls with a preview in iMessage, Discord, and the like.</p>
+      <p>Links are snapshots, frozen at the moment you share them. Keep editing and
+      your copy moves on; the link you sent stays exactly as it was. Share again to
+      send the newer version.</p>
+      <div class="tip"><strong>TIP</strong> — Your links are also your backup. Shelves
+      live in your browser, so clearing browsing data erases them — but opening any
+      link you saved rebuilds that shelf perfectly. Text yourself your shelf's link
+      once in a while.</div>
+
+      <h2><span class="no">04</span>Open someone's shelf</h2>
+      <p>Following a HashShelf link shows that shelf read-only, with covers, ratings,
+      notes, and a status filter. Two buttons matter:</p>
+      <ul>
+        <li><strong>Copy to my shelf</strong> — forks their list into your currently
+        active shelf. From then on it's yours: your edits, your links, no connection
+        back. Books you both had take <em>their</em> version of the rating and note.</li>
+        <li><strong>Compare with mine</strong> — jumps straight to a comparison
+        (see 06).</li>
+      </ul>
+      <div class="tip"><strong>TIP</strong> — For a clean copy instead of a merge,
+      create a new empty shelf first, then open their link and import into it.</div>
+
+      <h2><span class="no">05</span>Import from Goodreads</h2>
+      <p>On the Goodreads desktop site: <em>My Books → Import/Export → Export
+      Library</em>, which downloads a CSV. Back here, hit
+      <strong>Import Goodreads CSV</strong> and pick that file.</p>
+      <p>Your shelves map to statuses (<code>read</code> → finished,
+      <code>currently-reading</code> → reading, <code>to-read</code> → want, and a
+      custom <code>dnf</code>/<code>abandoned</code> shelf → did not finish). Star
+      ratings and written reviews come along. Books with no ISBN in the export —
+      usually ebooks and audiobooks — are skipped and named in the summary, so you can
+      add those few by title search.</p>
+
+      <h2><span class="no">06</span>Compare shelves</h2>
+      <p><strong>Compare shelves</strong> takes a friend's link (short or long) and
+      lays out: your overlap, the books you both loved, where your ratings disagree
+      most, and what each of you has that the other doesn't — with a one-tap
+      <em>add their books to my want list</em>.</p>
+      <p>It matches books intelligently: the same title added by ISBN on one shelf
+      and by search on the other still counts as the same book.</p>
+
+      <h2><span class="no">07</span>Filters &amp; genres</h2>
+      <p>Filter your list by status and by genre. Genres are worked out automatically
+      from Open Library's subject data — nothing to tag by hand, and they never bloat
+      your links because they're looked up, not stored.</p>
+
+      <h2><span class="no">08</span>Year in review</h2>
+      <p><strong>Year in review</strong> renders your shelf as a shareable card —
+      cover strip, books finished, average rating, top authors and genres, and your
+      rating spread. Download it as a PNG or send it straight to the share sheet on
+      your phone.</p>
+
+      <h2><span class="no">09</span>Install it &amp; offline</h2>
+      <p>HashShelf is installable: <em>Add to Home Screen</em> on your phone (or the
+      install icon in a desktop browser's address bar) gives it an icon and its own
+      window. After the first visit it works offline — your shelves are local, and
+      previously seen covers and titles are cached.</p>
+
+      <h2><span class="no">10</span>Your data, plainly</h2>
+      <ul>
+        <li>No account exists, so there's nothing to log into and nothing to breach.</li>
+        <li>Shelves live in your browser; shared shelves live in the links themselves.</li>
+        <li>Short links store that snapshot on the server, content-addressed, tied to no one.</li>
+        <li>Everything decodes on any device, any time — the site could vanish and
+        your links would still contain your books.</li>
+      </ul>
+      <p>The longer version of the philosophy lives on the
+      <a class="link" href="/about.html">About page</a>.</p>
+
+      <a class="link backlink" href="/">&larr; Back to your shelf</a>
+    </main>
+  </body>
+</html>

@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4.7"
+APP_VERSION = "1.4.8"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -50,7 +50,7 @@ ALLOWED_STATUSES = {"want", "reading", "finished", "did not finish"}
 ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
 
 STATIC_FILES = {
-    "index.html", "about.html", "styles.css", "ui.js", "lib.js", "snapshot.js",
+    "index.html", "about.html", "guide.html", "styles.css", "ui.js", "lib.js", "snapshot.js",
     "openlibrary.js", "service-worker.js", "manifest.json", "genres.json",
     "robots.txt", "config.js",
 }
