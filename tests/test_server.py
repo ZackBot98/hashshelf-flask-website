@@ -245,6 +245,39 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(book["workId"], "OL904W")
 
 
+class SecurityHeaderTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.client = server.app.test_client()
+
+    def test_headers_on_every_response_type(self):
+        for path in ("/", "/healthz", "/ui.js", "/about.html"):
+            h = self.client.get(path).headers
+            self.assertIn("script-src 'self'", h.get("Content-Security-Policy", ""), path)
+            self.assertIn("frame-ancestors 'none'", h.get("Content-Security-Policy", ""), path)
+            self.assertEqual(h.get("X-Content-Type-Options"), "nosniff", path)
+            self.assertEqual(h.get("Referrer-Policy"), "strict-origin-when-cross-origin", path)
+            self.assertEqual(h.get("X-Frame-Options"), "DENY", path)
+            self.assertIn("max-age=", h.get("Strict-Transport-Security", ""), path)
+
+    def test_csp_permits_only_expected_hosts(self):
+        csp = self.client.get("/").headers["Content-Security-Policy"]
+        # the complete third-party surface: OpenLibrary data + covers, nothing else
+        self.assertIn("https://openlibrary.org", csp)
+        self.assertIn("https://covers.openlibrary.org", csp)
+        # covers 302 to archive.org for the actual bytes; redirects must pass CSP too
+        self.assertIn("https://*.archive.org", csp)
+        for banned in ("unsafe-inline", "unsafe-eval", "googletagmanager", " * ", "http:"):
+            self.assertNotIn(banned, csp)
+
+    def test_no_inline_script_or_style_in_pages(self):
+        for path in ("/", "/about.html", "/guide.html"):
+            body = self.client.get(path).get_data(as_text=True)
+            self.assertNotIn("<script>", body, path)
+            self.assertNotIn("<style>", body, path)
+            self.assertNotIn(' style="', body, path)
+
+
 class SnapshotEndpointTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

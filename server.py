@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4.8"
+APP_VERSION = "1.4.9"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -667,6 +667,36 @@ def snapshot_page(slug):
     bootstrap = f'<script>window.__HASHSHELF_SNAPSHOT__="#{payload}";</script>'
     page = page.replace("<script", bootstrap + "\n    <script", 1)
     return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600"}
+
+
+# Locks the browser to exactly what the app is: same-origin code, OpenLibrary
+# data, nothing else. Third-party scripts become impossible, not just absent.
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data: https://covers.openlibrary.org https://archive.org https://*.archive.org; "
+    "connect-src 'self' https://openlibrary.org https://covers.openlibrary.org https://archive.org https://*.archive.org; "
+    "font-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "manifest-src 'self'; "
+    "worker-src 'self'"
+)
+
+
+@app.after_request
+def security_headers(resp):
+    h = resp.headers
+    h.setdefault("Content-Security-Policy", _CSP)
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    h.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return resp
 
 
 @app.get("/healthz")

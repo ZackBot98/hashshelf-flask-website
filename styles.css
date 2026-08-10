@@ -307,3 +307,54 @@ button.primary:disabled:hover { background: var(--red); color: #fcfbf8; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* Doc pages (about/guide) */
+.brand-link { text-decoration: none; color: inherit; }
+
+/* ---- about.html (moved inline for CSP style-src 'self') ---- */
+      .about { max-width: 640px; margin: 0 auto; padding: 8px 20px 72px; }
+      .about h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 34px 0 6px; }
+      .about .kicker {
+        font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--red);
+      }
+      .about h2 {
+        font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; font-family: var(--mono);
+        margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+      }
+      .about p { font-family: var(--serif); font-size: 17px; line-height: 1.65; margin: 0 0 14px; }
+      .about p code { font-family: var(--mono); font-size: 14px; }
+      .rules { margin: 0; padding: 0; list-style: none; }
+      .rules li {
+        font-family: var(--serif); font-size: 17px; line-height: 1.55;
+        padding: 12px 0 12px 2px; border-bottom: 1px solid var(--rule);
+        display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: baseline;
+      }
+      .rules li:first-child { border-top: 1px solid var(--rule); }
+      .rules .no {
+        font-family: var(--mono); font-size: 11px; color: var(--red); letter-spacing: .08em;
+      }
+      .small { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+      .backlink { display: inline-block; margin-top: 34px; }
+
+/* ---- guide.html (moved inline for CSP style-src 'self') ---- */
+      .guide { max-width: 640px; margin: 0 auto; padding: 8px 20px 72px; }
+      .guide h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 34px 0 6px; }
+      .guide .kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+      .guide .lede { font-family: var(--serif); font-size: 17px; line-height: 1.65; color: var(--muted); margin: 0 0 8px; }
+      .guide h2 {
+        font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; font-family: var(--mono);
+        margin: 38px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+      }
+      .guide h2 .no { color: var(--red); margin-right: 10px; }
+      .guide p { font-family: var(--serif); font-size: 16.5px; line-height: 1.62; margin: 0 0 12px; }
+      .guide p code, .guide li code { font-family: var(--mono); font-size: 13.5px; }
+      .guide ul { margin: 0 0 12px; padding-left: 20px; }
+      .guide li { font-family: var(--serif); font-size: 16.5px; line-height: 1.55; margin: 4px 0; }
+      .tip {
+        font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: var(--muted);
+        border-left: 2px solid var(--red); padding: 2px 0 2px 12px; margin: 0 0 12px;
+      }
+      .tip strong { color: var(--ink); font-weight: 600; letter-spacing: .06em; }
+      .backlink { display: inline-block; margin-top: 30px; }
