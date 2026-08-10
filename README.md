@@ -161,8 +161,13 @@ footer; with none set, neither renders and the page is byte-identical to before.
 
 Issues and ideas are welcome. The bar for changes: all three test suites pass
 (CI runs them on every push), the static-only fallback keeps working, and
-nothing ever requires a user account.
+nothing ever requires a user account. Contributions are accepted under the
+project's license.
 
 ## License
 
-[MIT](LICENSE).
+[Elastic License 2.0](LICENSE) — source-available. Read it, audit it, run it
+locally, send fixes. The one thing you may not do is offer HashShelf (or a
+substantial copy of it) as a hosted service to other people. That keeps every
+privacy claim on the [About page](https://hashshelf.com/about.html)
+independently verifiable while keeping hashshelf.com the only HashShelf.
