@@ -283,10 +283,12 @@ button.primary:disabled:hover { background: var(--red); color: #fcfbf8; }
 
 /* ---------------------------------------------------------------- footer */
 .site-footer {
-  max-width: 1020px; margin: 0 auto 28px; padding: 12px 20px 0;
+  max-width: 1020px; margin: 0 auto 14px; padding: 12px 20px 0;
   border-top: 1px solid var(--rule);
   color: var(--muted); font-size: 10.5px; letter-spacing: .04em; line-height: 1.6;
 }
+.site-footer:last-of-type { margin-bottom: 28px; }
+.site-footer .sep { margin: 0 7px; }
 
 /* ---------------------------------------------------------------- mobile */
 @media (max-width: 640px) {

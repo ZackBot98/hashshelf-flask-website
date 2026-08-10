@@ -1,8 +1,14 @@
 # HashShelf
 
+[![CI](https://github.com/ZackBot98/hashshelf-flask-website/actions/workflows/ci.yml/badge.svg)](https://github.com/ZackBot98/hashshelf-flask-website/actions/workflows/ci.yml)
+
 A hash-driven book tracker. No accounts. A link is the data.
 
-Live at [hashshelf.com](https://hashshelf.com).
+Live at **[hashshelf.com](https://hashshelf.com)** · [About / manifesto](https://hashshelf.com/about.html)
+
+<p align="center">
+  <img src="docs/wrapped-card.png" alt="A HashShelf year-in-review card: cover strip, books finished, top authors and genres, rating distribution" width="420" />
+</p>
 
 ## What it does
 
@@ -141,6 +147,12 @@ footer; with none set, neither renders and the page is byte-identical to before.
 - The server stores no user identity: no accounts, no cookies, and nothing in the database ties data to a person. Short links are content-addressed blobs. (The hosting layer's standard access logs exist, as with any web host.)
 - All rendering uses `textContent` — comments from shared links cannot inject HTML.
 
+## Contributing
+
+Issues and ideas are welcome. The bar for changes: all three test suites pass
+(CI runs them on every push), the static-only fallback keeps working, and
+nothing ever requires a user account.
+
 ## License
 
-Add your preferred license here (e.g., MIT).
+[MIT](LICENSE).
