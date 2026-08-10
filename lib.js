@@ -325,22 +325,25 @@
     canvas.width = CARD_W;
     canvas.height = CARD_H;
     const ctx = canvas.getContext('2d');
-    const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-    const ACCENT = '#4f8cff', TEXT = '#e9eef5', MUTED = '#9fb0c3', CARD = '#14161b', BORDER = '#242833';
+    // Card Catalog tokens: ink on index stock, stamp-red accent
+    const FONT = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
+    const MONO = '"Cascadia Code", "Segoe UI Mono", Consolas, Menlo, monospace';
+    const ACCENT = '#c23b22', TEXT = '#191817', MUTED = '#6e6b63', CARD = '#fcfbf8', BORDER = '#191817';
 
-    ctx.fillStyle = '#0b0c0f';
+    ctx.fillStyle = '#fcfbf8';
     ctx.fillRect(0, 0, CARD_W, CARD_H);
-    const glow = ctx.createRadialGradient(CARD_W / 2, 120, 40, CARD_W / 2, 120, 900);
-    glow.addColorStop(0, 'rgba(79,140,255,0.22)');
-    glow.addColorStop(1, 'rgba(79,140,255,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, CARD_W, 700);
+    // bookplate frame: heavy outer rule, hairline inner
+    ctx.strokeStyle = '#191817';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(22, 22, CARD_W - 44, CARD_H - 44);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(34, 34, CARD_W - 68, CARD_H - 68);
 
     // Header: measure so the # never collides with the title
     const heading = name ? `${name}'s year in books` : 'My year in books';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    const hashFont = `700 60px ${FONT}`;
+    const hashFont = `700 60px ${MONO}`;
     let titleFont = `600 52px ${FONT}`;
     ctx.font = hashFont;
     const hashW = ctx.measureText('#').width;
@@ -364,12 +367,12 @@
 
     ctx.textAlign = 'center';
     ctx.fillStyle = MUTED;
-    ctx.font = `400 34px ${FONT}`;
+    ctx.font = `400 26px ${MONO}`;
     ctx.fillText(String(year), CARD_W / 2, 172);
 
     // Cover strip. Covers may fail to load (offline, CORS); the layout below
     // flows from wherever this ends so a missing strip leaves no dead space.
-    let y = 214;
+    let y = 200;
     const strip = stats.covers.slice(0, 6);
     const imgs = strip.length ? (await Promise.all(strip.map(loadImage))).filter(Boolean) : [];
     if (imgs.length) {
@@ -377,7 +380,7 @@
       let x = (CARD_W - (imgs.length * cw + (imgs.length - 1) * gap)) / 2;
       for (const img of imgs) {
         ctx.save();
-        roundRect(ctx, x, y, cw, ch, 12);
+        roundRect(ctx, x, y, cw, ch, 3);
         ctx.clip();
         // cover-fit: crop to fill the slot without distorting the artwork
         const scale = Math.max(cw / img.width, ch / img.height);
@@ -386,11 +389,11 @@
         ctx.restore();
         ctx.strokeStyle = BORDER;
         ctx.lineWidth = 2;
-        roundRect(ctx, x, y, cw, ch, 12);
+        roundRect(ctx, x, y, cw, ch, 3);
         ctx.stroke();
         x += cw + gap;
       }
-      y += ch + 58;
+      y += ch + 46;
     } else {
       y += 40;
     }
@@ -401,9 +404,9 @@
     ctx.font = `800 190px ${FONT}`;
     ctx.fillText(String(finished), CARD_W / 2, y + 150);
     ctx.fillStyle = TEXT;
-    ctx.font = `600 44px ${FONT}`;
+    ctx.font = `500 40px ${FONT}`;
     ctx.fillText(finished === 1 ? 'book finished' : 'books finished', CARD_W / 2, y + 206);
-    y += 250;
+    y += 234;
 
     // Stat tiles
     const tiles = [
@@ -415,20 +418,20 @@
     let tx = (CARD_W - (tiles.length * tw + (tiles.length - 1) * tgap)) / 2;
     for (const [label, value] of tiles) {
       ctx.fillStyle = CARD;
-      roundRect(ctx, tx, y, tw, th, 18);
+      roundRect(ctx, tx, y, tw, th, 4);
       ctx.fill();
       ctx.strokeStyle = BORDER;
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.fillStyle = TEXT;
-      ctx.font = `700 52px ${FONT}`;
+      ctx.font = `600 52px ${FONT}`;
       ctx.fillText(value, tx + tw / 2, y + 70);
       ctx.fillStyle = MUTED;
-      ctx.font = `400 26px ${FONT}`;
-      ctx.fillText(label, tx + tw / 2, y + 112);
+      ctx.font = `400 20px ${MONO}`;
+      ctx.fillText(label.toUpperCase(), tx + tw / 2, y + 108);
       tx += tw + tgap;
     }
-    y += th + 70;
+    y += th + 56;
 
     // Top authors / genres
     ctx.textAlign = 'left';
@@ -437,7 +440,7 @@
     for (let c = 0; c < lists.length; c++) {
       const [label, entries] = lists[c];
       ctx.fillStyle = MUTED;
-      ctx.font = `600 28px ${FONT}`;
+      ctx.font = `600 22px ${MONO}`;
       ctx.fillText(label.toUpperCase(), colX[c], y);
       let ly = y + 52;
       if (!entries.length) {
@@ -450,20 +453,20 @@
         ctx.fillStyle = TEXT;
         ctx.fillText(fitText(ctx, entryLabel, 320), colX[c], ly);
         ctx.fillStyle = ACCENT;
-        ctx.font = `600 26px ${FONT}`;
+        ctx.font = `600 24px ${MONO}`;
         ctx.fillText(`×${count}`, colX[c] + 336, ly);
         ly += 52;
       }
     }
     y += 52 + 3 * 52 + 26;
 
-    // Rating distribution, pinned to the bottom of the card
-    const barsTop = Math.max(y + 34, CARD_H - 134);
+    // Rating distribution, pinned above the bookplate frame
+    const barsTop = Math.max(y + 34, CARD_H - 176);
     ctx.fillStyle = MUTED;
-    ctx.font = `600 28px ${FONT}`;
+    ctx.font = `600 22px ${MONO}`;
     ctx.fillText('RATINGS', 90, barsTop - 26);
     ctx.textAlign = 'right';
-    ctx.font = `500 26px ${FONT}`;
+    ctx.font = `500 22px ${MONO}`;
     ctx.fillText('hashshelf.com', CARD_W - 90, barsTop - 26);
     ctx.textAlign = 'left';
 
@@ -472,16 +475,19 @@
     let bx = 90;
     for (let r = 1; r <= 5; r++) {
       const h = Math.round((stats.dist[r] / maxCount) * barH);
-      ctx.fillStyle = '#1b1e26';
-      roundRect(ctx, bx, barsTop, barW, barH, 10);
+      ctx.fillStyle = '#ebe8de';
+      roundRect(ctx, bx, barsTop, barW, barH, 3);
       ctx.fill();
+      ctx.strokeStyle = '#c9c6bc';
+      ctx.lineWidth = 1;
+      ctx.stroke();
       if (h > 0) {
         ctx.fillStyle = ACCENT;
-        roundRect(ctx, bx, barsTop + (barH - h), barW, h, 10);
+        roundRect(ctx, bx, barsTop + (barH - h), barW, h, 3);
         ctx.fill();
       }
       ctx.fillStyle = MUTED;
-      ctx.font = `500 24px ${FONT}`;
+      ctx.font = `500 20px ${MONO}`;
       ctx.textAlign = 'center';
       ctx.fillText(`${r}★ ${stats.dist[r]}`, bx + barW / 2, barsTop + barH + 34);
       ctx.textAlign = 'left';
