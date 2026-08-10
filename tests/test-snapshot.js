@@ -80,6 +80,24 @@ const check = (name, cond, extra) => {
     check(`rejects ${bad}`, threw);
   }
 
+  // QA (v1.5.6): decompression-bomb link must be rejected, not inflated to GBs.
+  const bomb = '{"v":1,"name":"' + 'A'.repeat(20000000) + '","books":[]}';
+  const deflated = global.fflate.deflateSync(new TextEncoder().encode(bomb));
+  const b64u = Buffer.from(deflated).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const integ = crypto.createHash('sha256').update(Buffer.from(deflated)).digest('hex').slice(0, 12);
+  let bombRejected = false;
+  const t0 = Date.now();
+  try { await S.decodeFromHash('#' + b64u + '.' + integ); } catch { bombRejected = true; }
+  check('decompression bomb rejected', bombRejected);
+  check('bomb rejected fast (<500ms, bounded inflate)', Date.now() - t0 < 500, Date.now() - t0);
+
+  // A legitimately large shelf (near the 1000-book cap) must still decode.
+  const big = Array.from({ length: 1000 }, (_, i) =>
+    ({ idType: 'work', id: 'OL' + (100000 + i) + 'W', rating: i % 6, status: 'finished' }));
+  const bigHash = await S.encodeSnapshot(big, 'Big Shelf');
+  const bigDec = await S.decodeFromHash(bigHash);
+  check('1000-book shelf still decodes under the cap', bigDec.books.length === 1000);
+
   console.log(fails === 0 ? '\nALL SNAPSHOT TESTS PASSED' : `\n${fails} FAILURES`);
   process.exit(fails ? 1 : 0);
 })();

@@ -180,6 +180,28 @@
     return hash;
   }
 
+  // A shared link is untrusted input from anyone. Bound inflation so a
+  // maliciously crafted link can't decompress to gigabytes and hang the tab.
+  // A real 1000-book shelf inflates to well under this; the server caps at
+  // 512 KB, so anything it accepts still decodes here.
+  const MAX_INFLATED = 1024 * 1024;
+  const MAX_PAYLOAD_B64 = 64 * 1024;
+
+  function inflateBounded(bytes) {
+    const chunks = [];
+    let total = 0;
+    const inf = new fflate.Inflate((chunk) => {
+      total += chunk.length;
+      if (total > MAX_INFLATED) throw new Error("Snapshot too large");
+      chunks.push(chunk);
+    });
+    inf.push(bytes, true);
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (const c of chunks) { out.set(c, o); o += c.length; }
+    return out;
+  }
+
   async function decodeFromHash(hashStr) {
     if (!hashStr || !hashStr.startsWith('#')) {
       throw new Error("Missing hash prefix");
@@ -190,11 +212,12 @@
     const parts = remainder.split(".");
     if (parts.length !== 2) throw new Error("Malformed snapshot hash");
     const [payloadB64u, integrity] = parts;
+    if (payloadB64u.length > MAX_PAYLOAD_B64) throw new Error("Snapshot too large");
     const bytes = bytesFromBase64Url(payloadB64u);
     const digest = await sha256Hex(bytes);
     const expected = digest.slice(0, 12);
     if (expected !== integrity) throw new Error("Integrity check failed");
-    const inflated = fflate.inflateSync(bytes);
+    const inflated = inflateBounded(bytes);
     const json = decodeUtf8(inflated);
     let data;
     try {

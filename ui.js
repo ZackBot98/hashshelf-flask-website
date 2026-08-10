@@ -620,15 +620,25 @@
     clearSuggestions();
   }
 
+  // Must match the server's snapshot validator (ID_RE, comment cap) so a book
+  // that's addable is also always shortenable — otherwise the shelf works as a
+  // long link but silently can't become a short link, and won't hydrate either.
+  const ID_RE = /^[A-Za-z0-9 ._:-]{1,64}$/;
+  const MAX_COMMENT = 2000;
+
   function addOrUpdateBook(e) {
     e.preventDefault();
     const idType = idTypeEl.value.trim();
     const id = bookIdEl.value.trim();
     const ratingVal = ratingEl.value;
     const status = statusEl.value.trim();
-    const comment = commentEl.value.trim();
+    const comment = commentEl.value.trim().slice(0, MAX_COMMENT);
     const rating = ratingVal === '' ? undefined : Number(ratingVal);
     if (!id) return;
+    if (!ID_RE.test(id)) {
+      showNotice('That ID has characters HashShelf can’t use. Use an OpenLibrary Work ID (e.g. OL45804W) or an ISBN, or pick a search result.', 'error');
+      return;
+    }
     const entry = { idType, id, status, ...(rating !== undefined ? { rating } : {}), ...(comment ? { comment } : {}) };
     if (editIndex !== null) {
       books[editIndex] = entry;
