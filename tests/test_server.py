@@ -169,6 +169,25 @@ class ApiTests(unittest.TestCase):
                            ("/.gitignore", 404), ("/tests/test_server.py", 404)]:
             self.assertEqual(self.client.get(path).status_code, want, path)
 
+    def test_path_traversal_blocked(self):
+        # QA-found (pre-1.5.5): vendor/..%2fserver.py bypassed the allowlist and
+        # served source. Every encoding of traversal must now 404, and no
+        # response may contain source markers.
+        exploits = [
+            "/vendor/..%2fserver.py", "/icons/..%2fserver.py",
+            "/vendor/../server.py", "/vendor/..%2f..%2fserver.py",
+            "/vendor/..%5cserver.py", "/..%2fserver.py",
+            "/vendor/..%2frequirements.txt", "/icons/..%2f.gitignore",
+        ]
+        for p in exploits:
+            r = self.client.get(p)
+            self.assertEqual(r.status_code, 404, p)
+            self.assertNotIn(b"APP_VERSION", r.data, p)
+            self.assertNotIn(b"import flask", r.data, p)
+        # legitimate nested assets still serve
+        self.assertEqual(self.client.get("/vendor/fflate.min.js").status_code, 200)
+        self.assertEqual(self.client.get("/icons/icon-192.png").status_code, 200)
+
     def test_books_validation(self):
         self.assertEqual(self.client.post("/api/books", json={}).status_code, 400)
         self.assertEqual(self.client.post("/api/books", json={"books": []}).status_code, 400)

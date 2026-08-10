@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.4"
+APP_VERSION = "1.5.5"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -855,7 +855,17 @@ def index():
 
 @app.get("/<path:filename>")
 def static_file(filename):
+    # Reject traversal in any encoding before touching the filesystem: the "%2f"
+    # form (vendor/..%2fserver.py) still contains the ".." substring here, and
+    # both "/" and "\" separators are refused so no allowlisted prefix can be
+    # escaped. This does not rely on send_from_directory's own safety.
+    if ".." in filename or filename.startswith("/") or "\\" in filename:
+        abort(404)
     if filename not in STATIC_FILES and not filename.startswith(STATIC_DIRS):
+        abort(404)
+    # Defense in depth: the resolved path must stay inside ROOT.
+    full = os.path.realpath(os.path.join(ROOT, filename))
+    if full != ROOT and not full.startswith(ROOT + os.sep):
         abort(404)
     resp = send_from_directory(ROOT, filename)
     if filename == "service-worker.js":
