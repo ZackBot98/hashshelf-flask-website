@@ -16,7 +16,7 @@ Live at [hashshelf.com](https://hashshelf.com).
 - Filter by status **and genre**; genres are derived from OpenLibrary subjects, not stored in the link.
 - Live snapshot: the URL hash updates as you edit. "Create HashShelf" copies a shareable link (a short `/s/<slug>` link with a proper social preview when the backend is up, the full hash link otherwise).
 - Open any snapshot link to reconstruct the list deterministically. "Copy to my shelf" imports someone else's shelf into your own.
-- Optional name shown as "\<name\>'s books" (stored locally and in the hash).
+- Each shelf's name is the title shown on links you share (it travels in the hash; the schema's `name` field carries it).
 - Installable PWA; works offline after first load.
 
 ## Design invariant
@@ -76,7 +76,7 @@ node tests/test-lib.js
 python -m unittest discover tests
 ```
 
-Client state lives in the URL hash (shareable snapshot), `localStorage` (shelves, hydration cache, name, own-link set), and the Service Worker cache. Shelves are stored under `shelves:v1`; a pre-v1.3 single `booksDraft` is migrated automatically on first load.
+Client state lives in the URL hash (shareable snapshot), `localStorage` (shelves, hydration cache, own-link set), and the Service Worker cache. Shelves are stored under `shelves:v1`; a pre-v1.3 single `booksDraft` is migrated automatically on first load.
 
 ### Genres
 

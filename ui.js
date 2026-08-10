@@ -33,7 +33,6 @@
   const editorGenreSelect = $('#editorGenreSelect');
   const viewerFilterSelect = $('#viewerFilterSelect');
   const listTitle = $('#listTitle');
-  const displayName = $('#displayName');
 
   const shelfSelect = $('#shelfSelect');
   const newShelfBtn = $('#newShelfBtn');
@@ -56,7 +55,6 @@
   const wrappedDownload = $('#wrappedDownload');
   const wrappedShare = $('#wrappedShare');
 
-  const LS_NAME = 'displayName';
   const LS_BOOKS = 'booksDraft';          // pre-v1.3 single shelf; migrated on load
   const LS_SHELVES = 'shelves:v1';
   const LS_OWN_HASHES = 'ownHashes:v1';
@@ -173,13 +171,12 @@
 
   async function updateLiveHash() {
     try {
-      const name = (displayName?.value || '').trim();
-      if (!books.length && !name) {
+      if (!books.length) {
         history.replaceState(null, '', `${location.origin}${APP_PATH}`);
         snapshotOutput.classList.add('is-hidden');
         return;
       }
-      const hash = await HashShelfSnapshot.encodeSnapshot(books, name);
+      const hash = await HashShelfSnapshot.encodeSnapshot(books, activeShelf().name);
       const url = `${location.origin}${APP_PATH}${hash}`;
       history.replaceState(null, '', url);
       rememberOwnHash(hash);
@@ -329,8 +326,7 @@
   async function renderEditorList() {
     const gen = ++editorGen;
     editorList.innerHTML = '';
-    const name = (displayName?.value || '').trim();
-    if (listTitle) listTitle.textContent = name ? `${name}'s books` : 'Your books';
+    if (listTitle) listTitle.textContent = activeShelf().name;
     renderShelfSelect();
 
     if (!books.length) {
@@ -639,7 +635,7 @@
 
   async function createSnapshot() {
     try {
-      const hash = await HashShelfSnapshot.encodeSnapshot(books, (displayName?.value || '').trim());
+      const hash = await HashShelfSnapshot.encodeSnapshot(books, activeShelf().name);
       const longLink = `${location.origin}${APP_PATH}${hash}`;
       history.replaceState(null, '', longLink);
       rememberOwnHash(hash);
@@ -711,7 +707,7 @@
   async function loadSnapshotHash(hashStr) {
     try {
       const data = await HashShelfSnapshot.decodeFromHash(hashStr);
-      if (viewerTitle) viewerTitle.textContent = data?.name ? `${data.name}'s books` : 'HashShelf';
+      if (viewerTitle) viewerTitle.textContent = data?.name || 'A shared shelf';
       lastViewerBooks = data.books;
       switchToViewer();
       await renderViewer(data.books);
@@ -891,7 +887,7 @@
 
       const [mine, theirs] = await Promise.all([toEntries(books), toEntries(theirData.books)]);
       const result = HashShelfLib.compareShelves(mine, theirs);
-      const theirName = theirData.name || 'They';
+      const theirLabel = theirData.name || 'their shelf';
       showNotice('', '');
 
       const summary = document.createElement('div');
@@ -899,7 +895,7 @@
       const tiles = [
         [`${result.overlapPct}%`, 'shelf overlap'],
         [String(result.both.length), 'books in common'],
-        [String(result.onlyTheirs.length), `only on ${theirName}'s shelf`],
+        [String(result.onlyTheirs.length), `only on ${theirLabel}`],
         [String(result.onlyMine.length), 'only on yours']
       ];
       for (const [value, label] of tiles) {
@@ -918,14 +914,14 @@
 
       compareResults.appendChild(compareSection(
         `Both loved these`,
-        result.agreements.map(a => compareRow(a.mine, `you ${ratingText(a.mine.book.rating)} · ${theirName} ${ratingText(a.theirs.book.rating)}`))
+        result.agreements.map(a => compareRow(a.mine, `you ${ratingText(a.mine.book.rating)} · them ${ratingText(a.theirs.book.rating)}`))
       ));
       compareResults.appendChild(compareSection(
         `You disagree most on`,
-        result.disagreements.map(d => compareRow(d.mine, `you ${ratingText(d.mine.book.rating)} · ${theirName} ${ratingText(d.theirs.book.rating)}`))
+        result.disagreements.map(d => compareRow(d.mine, `you ${ratingText(d.mine.book.rating)} · them ${ratingText(d.theirs.book.rating)}`))
       ));
       compareResults.appendChild(compareSection(
-        `On ${theirName}'s shelf, not yours`,
+        `On ${theirLabel}, not yours`,
         result.onlyTheirs.map(e => compareRow(e))
       ));
       compareResults.appendChild(compareSection(
@@ -968,7 +964,7 @@
       const hydrated = await OpenLibrary.hydrateAll(books);
       const stats = HashShelfLib.buildStats(hydrated.map(h => ({ book: h, meta: h.meta })));
       wrappedCanvas = await HashShelfLib.renderWrappedCard(stats, {
-        name: (displayName?.value || '').trim()
+        name: activeShelf().name
       });
       wrappedCanvasWrap.innerHTML = '';
       wrappedCanvas.classList.add('wrapped-img');
@@ -1042,7 +1038,7 @@
 
     shelfSelect.addEventListener('change', () => switchShelf(shelfSelect.value));
     newShelfBtn.addEventListener('click', () => {
-      const name = (prompt('Name for the new shelf?', 'New shelf') || '').trim();
+      const name = (prompt('Shelf name (this is the title on links you share):', 'New shelf') || '').trim();
       if (!name) return;
       const shelf = { id: newId(), name: name.slice(0, 60), books: [] };
       store.shelves.push(shelf);
@@ -1052,11 +1048,13 @@
     });
     renameShelfBtn.addEventListener('click', () => {
       const shelf = activeShelf();
-      const name = (prompt('Rename shelf', shelf.name) || '').trim();
+      const name = (prompt('Rename shelf (this is the title on links you share):', shelf.name) || '').trim();
       if (!name) return;
       shelf.name = name.slice(0, 60);
       saveShelves();
       renderShelfSelect();
+      renderEditorList();
+      updateLiveHash();
     });
     deleteShelfBtn.addEventListener('click', () => {
       if (store.shelves.length <= 1) return;
@@ -1101,11 +1099,6 @@
     editorFilterSelect?.addEventListener('change', () => renderEditorList());
     editorGenreSelect?.addEventListener('change', () => renderEditorList());
     viewerFilterSelect?.addEventListener('change', () => { if (lastViewerBooks) renderViewer(lastViewerBooks); });
-    displayName?.addEventListener('input', () => {
-      try { localStorage.setItem(LS_NAME, (displayName.value || '').trim()); } catch {}
-      renderEditorList();
-      updateLiveHash();
-    });
   }
 
   function init() {
@@ -1115,10 +1108,6 @@
     if (disclosure && HashShelfLib.affiliateActive(window.HashShelfConfig)) {
       disclosure.classList.remove('is-hidden');
     }
-    try {
-      const savedName = localStorage.getItem(LS_NAME);
-      if (savedName && displayName) displayName.value = savedName;
-    } catch {}
     renderShelfSelect();
     renderEditorList();
     initEvents();

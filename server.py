@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -645,7 +645,7 @@ def snapshot_page(slug):
     if row is None:
         abort(404)
     payload, name, count = row
-    title = f"{name}’s books — HashShelf" if name else "A HashShelf shelf"
+    title = f"{name} — HashShelf" if name else "A HashShelf shelf"
     plural = "book" if count == 1 else "books"
     desc = f"{count} {plural} · shared with HashShelf, the link-based book tracker. No accounts."
 

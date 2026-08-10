@@ -340,7 +340,7 @@
     ctx.strokeRect(34, 34, CARD_W - 68, CARD_H - 68);
 
     // Header: measure so the # never collides with the title
-    const heading = name ? `${name}'s year in books` : 'My year in books';
+    const heading = name || 'My books';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     const hashFont = `700 60px ${MONO}`;
@@ -368,7 +368,7 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = MUTED;
     ctx.font = `400 26px ${MONO}`;
-    ctx.fillText(String(year), CARD_W / 2, 172);
+    ctx.fillText(`YEAR IN BOOKS · ${year}`, CARD_W / 2, 172);
 
     // Cover strip. Covers may fail to load (offline, CORS); the layout below
     // flows from wherever this ends so a missing strip leaves no dead space.

@@ -23,7 +23,7 @@ network access.
 - [ ] Add book with rating/status/comment → row renders, hydrates title/author/cover/genre chips
 - [ ] Add the same book again → updates in place with notice, no duplicate
 - [ ] Edit and Delete a row; rating `0` displays as `0 ★`, unrated as `No rating`
-- [ ] URL hash updates live as you edit; empty shelf + empty name → clean URL
+- [ ] URL hash updates live as you edit; an empty shelf → clean URL
 - [ ] Reload mid-edit → returns to **editor** (not viewer), draft intact
 - [ ] Create HashShelf → short link copied; paste in new private window → viewer renders
 - [ ] Open the long `#…` link in a private window → viewer renders identically
@@ -33,7 +33,7 @@ network access.
 ### 2.2 v1.3 features
 
 - [ ] Import a real `goodreads_library_export.csv` → correct counts in notice; skipped-no-ISBN titles listed; statuses/ratings/reviews mapped
-- [ ] Shelves: create, rename, delete (blocked at one shelf); books isolated per shelf; counts in dropdown; survives reload
+- [ ] Shelves: create, rename, delete (blocked at one shelf); books isolated per shelf; counts in dropdown; survives reload; renaming updates the live link and the shared title
 - [ ] Genre filter populates from hydrated books and filters correctly; status+genre combine
 - [ ] Compare: paste a short link and a long link; tiles + four sections render; "Add their N books" merges as `want`
 - [ ] Viewer → "Compare with mine" works
