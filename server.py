@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4.9"
+APP_VERSION = "1.5.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -138,6 +138,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS snapshots (
           slug TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT NOT NULL,
           name TEXT, book_count INTEGER NOT NULL, created_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS prewarm_state (
+          k TEXT PRIMARY KEY, v TEXT NOT NULL
         );
         """
     )
@@ -448,6 +451,138 @@ def get_book(id_type, book_id):
             return {"title": None, "authors": [], "coverUrl": None, "genres": [], "workId": None, "isbn": None, "ok": False}
 
 
+# ---------------------------------------------------------------- prewarm
+#
+# Slow background accumulation of popular books into the cache, so first-time
+# visitors hit warm data. Trending lists repeat heavily day to day, so the
+# worker: (1) skips anything already cached before any upstream call, (2)
+# memoizes each source list in memory, and (3) descends a ladder of sources —
+# trending daily -> weekly -> monthly -> yearly -> forever -> paginated
+# subject walks — with its cursor persisted in the DB, so on a durable disk
+# it keeps discovering NEW books for months instead of rereading page one.
+#
+# Budget: <= PREWARM_BATCH hydrations per PREWARM_INTERVAL (~30 books/hour),
+# all through get_book (token bucket, dedupe, failures-never-cached).
+# Future idea (Zack): raise the pace during off-peak hours.
+
+PREWARM_INTERVAL = 600      # seconds between cycles
+PREWARM_BATCH = 5           # max hydrations per cycle
+
+_PREWARM_TRENDING = ["daily", "weekly", "monthly", "yearly", "forever"]
+_PREWARM_SUBJECTS = [
+    "fantasy", "science_fiction", "romance", "mystery", "thrillers", "horror",
+    "historical_fiction", "young_adult_fiction", "biography", "history",
+    "poetry", "philosophy", "psychology", "self_help", "short_stories",
+]
+_prewarm_lists = {}  # source -> {"ids": [...], "at": ts}
+_prewarm_started = False
+
+_WORK_KEY_RE = re.compile(r"^/works/(OL[^/]+W)$")
+
+
+def _extract_work_ids(payload):
+    ids = []
+    for w in (payload or {}).get("works") or []:
+        m = _WORK_KEY_RE.match(str(w.get("key") or ""))
+        if m:
+            ids.append(m.group(1))
+    return ids
+
+
+def _prewarm_get_state():
+    row = db().execute("SELECT v FROM prewarm_state WHERE k='cursor'").fetchone()
+    if row:
+        try:
+            s = json.loads(row[0])
+            return int(s.get("source", 0)), int(s.get("offset", 0))
+        except Exception:
+            pass
+    return 0, 0
+
+
+def _prewarm_set_state(source, offset):
+    db().execute(
+        "INSERT OR REPLACE INTO prewarm_state (k, v) VALUES ('cursor', ?)",
+        (json.dumps({"source": source, "offset": offset}),),
+    )
+    db().commit()
+
+
+def _prewarm_source_ids(source_idx, offset):
+    """Returns work ids for a ladder position. Trending lists are memoized;
+    subject walks are fetched per page (offset advances through the catalog)."""
+    n_trend = len(_PREWARM_TRENDING)
+    if source_idx < n_trend:
+        name = _PREWARM_TRENDING[source_idx]
+        ttl = 86400 if name == "daily" else 7 * 86400
+        memo = _prewarm_lists.get(name)
+        if not memo or time.time() - memo["at"] > ttl:
+            data = ol_get(f"/trending/{name}.json", params={"limit": 100})
+            memo = {"ids": _extract_work_ids(data), "at": time.time()}
+            _prewarm_lists[name] = memo
+        return memo["ids"]
+    subject = _PREWARM_SUBJECTS[(source_idx - n_trend) % len(_PREWARM_SUBJECTS)]
+    data = ol_get(f"/subjects/{subject}.json", params={"limit": 25, "offset": offset})
+    return _extract_work_ids(data)
+
+
+def _prewarm_cycle():
+    source, offset = _prewarm_get_state()
+    n_sources = len(_PREWARM_TRENDING) + len(_PREWARM_SUBJECTS)
+    hydrated = 0
+    hops = 0
+    while hydrated < PREWARM_BATCH and hops < 4:  # a few ladder hops per cycle max
+        try:
+            ids = _prewarm_source_ids(source, offset)
+        except Exception:
+            ids = []
+        fresh_new = []
+        for wid in ids:
+            row = db().execute(
+                "SELECT fetched_at, genres FROM books WHERE id_type='work' AND id=?", (wid,)
+            ).fetchone()
+            if not (row and _fresh(row[0], BOOK_TTL)):
+                fresh_new.append(wid)
+        if not fresh_new:
+            # source exhausted at this position: advance the ladder
+            if source < len(_PREWARM_TRENDING):
+                source, offset = source + 1, 0
+            else:
+                offset += 25
+                if offset >= 500:  # cap each subject walk, then move on
+                    source, offset = source + 1, 0
+            if source >= n_sources:
+                source, offset = 0, 0  # wrap: trending has fresh entries by now
+            hops += 1
+            continue
+        for wid in fresh_new[: PREWARM_BATCH - hydrated]:
+            result = get_book("work", wid)
+            if result.get("ok"):
+                hydrated += 1
+    _prewarm_set_state(source, offset)
+    return hydrated
+
+
+def _prewarm_loop():
+    time.sleep(90)  # let the service settle after boot
+    while True:
+        try:
+            n = _prewarm_cycle()
+            if n:
+                log.info("prewarm: cached %d new book(s)", n)
+        except Exception:
+            log.warning("prewarm cycle failed", exc_info=True)
+        time.sleep(PREWARM_INTERVAL)
+
+
+def start_prewarmer():
+    global _prewarm_started
+    if _prewarm_started:
+        return
+    _prewarm_started = True
+    threading.Thread(target=_prewarm_loop, name="prewarm", daemon=True).start()
+
+
 # ----------------------------------------------------------------- routes
 
 @app.post("/api/books")
@@ -703,7 +838,9 @@ def security_headers(resp):
 def healthz():
     # db_on_disk: True when the database lives on the persistent disk, i.e.
     # short links and the cache survive restarts. Diagnostic, not sensitive.
-    return {"ok": True, "version": APP_VERSION, "db_on_disk": DB_PATH.startswith("/var/data")}
+    cached = db().execute("SELECT COUNT(*) FROM books").fetchone()[0]
+    return {"ok": True, "version": APP_VERSION,
+            "db_on_disk": DB_PATH.startswith("/var/data"), "books_cached": cached}
 
 
 @app.get("/favicon.ico")
@@ -730,6 +867,10 @@ def static_file(filename):
 
 init_db()
 
+if os.environ.get("RENDER"):
+    start_prewarmer()
+
 if __name__ == "__main__":
+    start_prewarmer()
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, threaded=True)

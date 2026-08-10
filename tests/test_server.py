@@ -245,6 +245,55 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(book["workId"], "OL904W")
 
 
+class PrewarmTests(unittest.TestCase):
+    def test_thread_never_starts_on_import(self):
+        # CI and tests import server; the background worker must stay off
+        self.assertFalse(server._prewarm_started)
+
+    def test_extract_work_ids(self):
+        payload = {"works": [
+            {"key": "/works/OL111W"}, {"key": "/works/OL222W"},
+            {"key": "/books/OL5M"}, {"key": None}, {},
+        ]}
+        self.assertEqual(server._extract_work_ids(payload), ["OL111W", "OL222W"])
+        self.assertEqual(server._extract_work_ids({}), [])
+        self.assertEqual(server._extract_work_ids(None), [])
+
+    def test_cursor_roundtrip(self):
+        server._prewarm_set_state(7, 125)
+        self.assertEqual(server._prewarm_get_state(), (7, 125))
+        server._prewarm_set_state(0, 0)
+
+    def test_cycle_hydrates_new_and_skips_cached(self):
+        server._prewarm_set_state(0, 0)
+        server._prewarm_lists.clear()
+        routes = {
+            "/trending/daily": {"works": [{"key": "/works/OL801W"}, {"key": "/works/OL802W"}]},
+            "/works/OL801W/editions": {"entries": []},
+            "/works/OL802W/editions": {"entries": []},
+            "/works/OL801W": {"key": "/works/OL801W", "title": "Warm One", "subjects": [], "authors": []},
+            "/works/OL802W": {"key": "/works/OL802W", "title": "Warm Two", "subjects": [], "authors": []},
+        }
+        with mock.patch.object(server, "ol_get", side_effect=fake_ol(routes)):
+            hydrated = server._prewarm_cycle()
+        self.assertEqual(hydrated, 2)
+        row = server.db().execute(
+            "SELECT title FROM books WHERE id_type='work' AND id='OL801W'").fetchone()
+        self.assertEqual(row[0], "Warm One")
+
+        # Second cycle: same trending list (memoized), everything cached ->
+        # zero hydrations, and the ladder must advance instead of stalling
+        with mock.patch.object(server, "ol_get", side_effect=fake_ol({
+            "/trending/": {"works": []}, "/subjects/": {"works": []},
+        })):
+            hydrated2 = server._prewarm_cycle()
+        self.assertEqual(hydrated2, 0)
+        source, _ = server._prewarm_get_state()
+        self.assertGreater(source, 0)
+        server._prewarm_set_state(0, 0)
+        server._prewarm_lists.clear()
+
+
 class SecurityHeaderTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
