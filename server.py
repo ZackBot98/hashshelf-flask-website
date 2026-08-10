@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.4.2"
+APP_VERSION = "1.4.3"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -671,7 +671,9 @@ def snapshot_page(slug):
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "version": APP_VERSION}
+    # db_on_disk: True when the database lives on the persistent disk, i.e.
+    # short links and the cache survive restarts. Diagnostic, not sensitive.
+    return {"ok": True, "version": APP_VERSION, "db_on_disk": DB_PATH.startswith("/var/data")}
 
 
 @app.get("/favicon.ico")
