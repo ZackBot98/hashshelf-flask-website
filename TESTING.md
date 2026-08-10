@@ -107,3 +107,6 @@ Stop `server.py`, serve statically: `python -m http.server 8000`, hard-reload.
   them on restart; documented in render.yaml)
 - Shelf management uses `prompt()`/`confirm()` — functional everywhere, polish later
 - `/s/` pages 404 when the backend is absent (static hosting) — by design
+- The prewarmer makes a slow trickle of OpenLibrary calls (≤ ~30 books/hour)
+  on running servers — expected background noise in logs; `books_cached` in
+  `/healthz` should climb over time. It never runs in tests or CI
