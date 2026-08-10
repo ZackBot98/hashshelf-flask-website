@@ -1,18 +1,16 @@
 # Render blueprint for HashShelf.
 #
-# Free plan notes:
-#  - The service spins down after ~15 min idle (30-60s cold start). The client
-#    falls back to calling OpenLibrary directly while the API is cold, so the
-#    app still works — upgrade plan to "starter" to keep it always-on.
-#  - The filesystem is ephemeral on the free plan: the SQLite cache rebuilds
-#    itself (fine), but SHORT LINKS DO NOT SURVIVE deploys/restarts without a
-#    disk. Before sharing short links for real, either attach the disk below
-#    (requires a paid instance) or point HASHSHELF_DB at durable storage.
+# Paid setup (Starter + 1GB disk, ~$7.25/mo): always-on (no cold starts), and
+# the SQLite database lives on the persistent disk, which is what makes short
+# links and the OpenLibrary cache survive deploys and restarts.
+#
+# Note: an attached disk disables zero-downtime deploys — each deploy has a
+# few seconds of restart blip. Acceptable at this scale.
 services:
   - type: web
     name: hashshelf
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
     # Single worker: keeps the OpenLibrary token bucket + in-flight dedupe
     # global (they are per-process) and gives SQLite a single writer process.
@@ -22,9 +20,9 @@ services:
     envVars:
       - key: HASHSHELF_CONTACT
         value: https://hashshelf.com
-    # Uncomment for durable SQLite (paid instance required), and set
-    # HASHSHELF_DB=/var/data/hashshelf.db in envVars above:
-    # disk:
-    #   name: hashshelf-data
-    #   mountPath: /var/data
-    #   sizeGB: 1
+      - key: HASHSHELF_DB
+        value: /var/data/hashshelf.db
+    disk:
+      name: hashshelf-data
+      mountPath: /var/data
+      sizeGB: 1
