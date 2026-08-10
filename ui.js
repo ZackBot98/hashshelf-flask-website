@@ -398,6 +398,19 @@
     titleSuggestionsEl.classList.add('is-hidden');
   }
 
+  // Status row inside the dropdown: "searching", "no matches", "failed".
+  // Without it, slow or empty searches look identical to a dead input.
+  function setSearchStatus(text, busy) {
+    suggestions = [];
+    activeSuggestion = -1;
+    titleSuggestionsEl.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'suggestion-status' + (busy ? ' busy' : '');
+    row.textContent = text;
+    titleSuggestionsEl.appendChild(row);
+    titleSuggestionsEl.classList.remove('is-hidden');
+  }
+
   function suggestionItemTemplate(s, idx) {
     const item = document.createElement('div');
     item.className = 'suggestion-item' + (idx === activeSuggestion ? ' active' : '');
@@ -522,22 +535,28 @@
   function onSearchInput() {
     const q = titleSearchEl.value.trim();
     if (!q) { clearSuggestions(); return; }
+    setSearchStatus('Searching the catalog', true); // immediate feedback, before the debounce
     if (searchDebounce) clearTimeout(searchDebounce);
     searchDebounce = setTimeout(async () => {
       const gen = ++searchGen;
       try {
         const { docs, enriched } = await OpenLibrary.search(q, { limit: 10 });
         if (gen !== searchGen) return;
+        if (!docs.length) {
+          setSearchStatus(`No matches for “${q}” — try the exact title, or add by ISBN below`);
+          return;
+        }
         suggestions = docs;
         activeSuggestion = -1;
         renderSuggestions(enriched);
       } catch {
-        if (gen === searchGen) clearSuggestions();
+        if (gen === searchGen) setSearchStatus('Search unavailable — it will retry as you type');
       }
     }, 250);
   }
 
   function onSearchKeydown(e) {
+    if (e.key === 'Escape') { clearSuggestions(); return; }
     if (!suggestions.length) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();

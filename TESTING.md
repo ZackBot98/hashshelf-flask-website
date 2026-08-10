@@ -19,7 +19,7 @@ network access.
 
 ### 2.1 Core flows (run against `python server.py`, http://localhost:8000)
 
-- [ ] Search by title → suggestions appear with covers → select → form fills with work ID + cover preview
+- [ ] Search by title → "Searching the catalog…" shows immediately, then suggestions with covers; gibberish shows a no-matches row; Escape dismisses → select → form fills with work ID + cover preview
 - [ ] Add book with rating/status/comment → row renders, hydrates title/author/cover/genre chips
 - [ ] Add the same book again → updates in place with notice, no duplicate
 - [ ] Edit and Delete a row; rating `0` displays as `0 ★`, unrated as `No rating`

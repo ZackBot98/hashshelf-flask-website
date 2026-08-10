@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hashshelf-cache-v45';
+const CACHE_NAME = 'hashshelf-cache-v46';
 const API_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ASSETS = [
   '/',
