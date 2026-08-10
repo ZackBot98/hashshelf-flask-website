@@ -135,9 +135,10 @@ Still fully supported — publish the repo root as-is. Everything works except s
 
 ## Affiliate links
 
-Buy links are off until an id is set in [`config.js`](config.js). With one set,
-each book row gets a small "Buy" link and the required disclosure appears in the
-footer; with none set, neither renders and the page is byte-identical to before.
+Buy links are driven entirely by [`config.js`](config.js): with an id set, each
+book row gets Amazon + Audiobook links and the required disclosure appears in
+the footer; with none set, neither renders. hashshelf.com ships with its Amazon
+id configured — if you run a copy locally, clear or replace it.
 
 - Amazon links use the ISBN-10 (which is the ASIN for print books), derived from
   the ISBN-13 when needed; 979-prefixed ISBNs and books with no ISBN fall back to

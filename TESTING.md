@@ -37,6 +37,7 @@ network access.
 - [ ] Genre filter populates from hydrated books and filters correctly; status+genre combine
 - [ ] Compare: paste a short link and a long link; tiles + four sections render; "Add their N books" merges as `want`
 - [ ] Viewer → "Compare with mine" works
+- [ ] Buy links: rows show Amazon + Audiobook chips carrying the affiliate tag; disclosure footer visible; both vanish if `config.js` ids are cleared
 - [ ] Year in review: card renders **with covers**; Download saves a PNG; Share shows native sheet (mobile); works on an empty-ratings shelf (avg shows `—`)
 
 ### 2.3 Degraded mode (backend down — the static-hosting story)
