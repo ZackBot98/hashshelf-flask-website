@@ -67,6 +67,27 @@ shortened (fell back to the long link) — and wouldn't hydrate anyway.
   always shortenable. (Search-added books were never affected; this only
   touched manual ID-field entry.)
 
+### F5 — Short links broken by CSP — **CRITICAL** — FIXED (v1.5.8, post-launch-prep)
+
+Found when a real short link was reported opening nothing. The `/s/` page handed
+the snapshot to the app through an **inline `<script>`**, but the strict CSP
+added in v1.4.9 (`script-src 'self'`) blocks inline scripts — so the bootstrap
+never executed, `window.__HASHSHELF_SNAPSHOT__` stayed undefined, and every
+short link fell back to the empty editor (then rewrote its URL to `/`). The
+OpenGraph unfurl still worked (meta tags, not scripts), which masked it.
+**Every short link had been broken since v1.4.9.**
+
+- **Root cause / process gap:** the original QA pass tested the `/s/` page via
+  `curl` (server output) and tested the viewer via `location.hash` in a browser,
+  but never opened a real `/s/` short link *in a browser* after the CSP shipped.
+  The server-rendered short-link path had no browser-level E2E coverage.
+- **Fix:** pass the snapshot via a `<meta name="hashshelf-snapshot">` tag instead
+  of an inline script — CSP-clean, no nonce needed. Regression test asserts the
+  `/s/` page carries the meta tag and contains **zero inline scripts** (every
+  `<script>` must have `src=`), which would have caught this.
+- **Verified:** a real short link renders the full shelf in a browser with zero
+  CSP violations, locally and on production.
+
 ### F4 — HSTS missing from static-fallback `_headers` — **LOW** — FIXED (v1.5.6)
 
 The Flask app sends `Strict-Transport-Security`, but the `_headers` file used
