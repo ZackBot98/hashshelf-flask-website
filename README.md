@@ -142,6 +142,9 @@ footer; with none set, neither renders and the page is byte-identical to before.
 - Amazon links use the ISBN-10 (which is the ASIN for print books), derived from
   the ISBN-13 when needed; 979-prefixed ISBNs and books with no ISBN fall back to
   a search link that still carries attribution.
+- An **Audiobook** link accompanies each Amazon link: a tagged search constrained
+  to the Audible catalog (audiobook ASINs aren't derivable from ISBNs), built
+  from the book's title and author.
 - Books added by *work* id have no ISBN of their own, so hydration stores a
   representative English-edition ISBN (`work_editions.en_isbn`) — this is what
   lets every book link out, not just ISBN-added ones.

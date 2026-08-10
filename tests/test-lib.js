@@ -126,7 +126,13 @@ const check = (name, cond, extra) => {
 
   const amz = L.buyLinks(meta, { amazonTag: 'hashshelf-20' });
   check('amazon link uses ASIN + tag',
-    amz.length === 1 && amz[0].url === 'https://www.amazon.com/dp/0547928246?tag=hashshelf-20', amz);
+    amz.length === 2 && amz[0].url === 'https://www.amazon.com/dp/0547928246?tag=hashshelf-20', amz);
+  check('audiobook link: audible index + tag + title',
+    amz[1].label === 'Audiobook' && amz[1].url.includes('i=audible')
+    && amz[1].url.includes('k=The%20Hobbit') && amz[1].url.includes('tag=hashshelf-20'), amz[1]);
+  const withAuthor = L.buyLinks({ title: 'Dune', isbn: '9780441013593', authors: ['Frank Herbert'] }, { amazonTag: 't-20' });
+  check('audiobook query includes author',
+    withAuthor[1].url.includes('k=Dune%20Frank%20Herbert'), withAuthor[1]);
 
   const amz979 = L.buyLinks({ title: 'New Book', isbn: '9791234567896' }, { amazonTag: 'hashshelf-20' });
   check('979 falls back to search link',
@@ -140,7 +146,8 @@ const check = (name, cond, extra) => {
     L.buyLinks({ title: '', isbn: null }, { amazonTag: 'hashshelf-20' }).length === 0);
 
   const both = L.buyLinks(meta, { amazonTag: 'hashshelf-20', bookshopId: '12345' });
-  check('both programs render', both.length === 2 && both[1].url === 'https://bookshop.org/a/12345/9780547928241', both);
+  check('all programs render in order', both.length === 3 && both[1].label === 'Audiobook'
+    && both[2].url === 'https://bookshop.org/a/12345/9780547928241', both);
 
   const host = L.buyLinks(meta, { amazonTag: 't-21', amazonHost: 'www.amazon.co.uk' });
   check('custom marketplace host', host[0].url.startsWith('https://www.amazon.co.uk/dp/'), host);

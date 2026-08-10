@@ -199,6 +199,14 @@
         const q = encodeURIComponent(isbnDigits(isbn) || title);
         if (q) out.push({ label: 'Amazon', url: `https://${host}/s?k=${q}&tag=${tag}` });
       }
+      // Audiobook editions are separate Audible ASINs we can't derive from an
+      // ISBN, so link a tagged search constrained to the Audible catalog —
+      // usually a one-result page for the exact book.
+      if (title) {
+        const author = ((meta && meta.authors) || [])[0] || '';
+        const audioQ = encodeURIComponent(`${title} ${author}`.trim());
+        out.push({ label: 'Audiobook', url: `https://${host}/s?k=${audioQ}&i=audible&tag=${tag}` });
+      }
     }
 
     if (cfg.bookshopId) {
