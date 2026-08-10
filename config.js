@@ -9,7 +9,7 @@
  */
 window.HashShelfConfig = {
   // Amazon Associates tracking id, e.g. 'hashshelf-20'
-  amazonTag: '',
+  amazonTag: 'hashshelf-20',
   // Amazon marketplace host; change for a non-US primary audience
   amazonHost: 'www.amazon.com',
 
