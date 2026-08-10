@@ -50,8 +50,9 @@ ALLOWED_STATUSES = {"want", "reading", "finished", "did not finish"}
 ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
 
 STATIC_FILES = {
-    "index.html", "styles.css", "ui.js", "lib.js", "snapshot.js", "openlibrary.js",
-    "service-worker.js", "manifest.json", "genres.json", "robots.txt", "config.js",
+    "index.html", "about.html", "styles.css", "ui.js", "lib.js", "snapshot.js",
+    "openlibrary.js", "service-worker.js", "manifest.json", "genres.json",
+    "robots.txt", "config.js",
 }
 STATIC_DIRS = ("vendor/", "icons/")
 

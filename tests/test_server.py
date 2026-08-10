@@ -163,6 +163,7 @@ class ApiTests(unittest.TestCase):
     def test_static_allowlist(self):
         for path, want in [("/ui.js", 200), ("/vendor/fflate.min.js", 200),
                            ("/robots.txt", 200), ("/genres.json", 200),
+                           ("/about.html", 200),
                            ("/server.py", 404), ("/render.yaml", 404),
                            ("/requirements.txt", 404), ("/data/hashshelf.db", 404),
                            ("/.gitignore", 404), ("/tests/test_server.py", 404)]:

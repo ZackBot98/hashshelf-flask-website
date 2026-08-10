@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>About — HashShelf</title>
+    <meta name="description" content="Why HashShelf exists: a book tracker with no accounts, no feed, and no database of you. The link is the data." />
+    <meta property="og:title" content="About HashShelf" />
+    <meta property="og:description" content="A book tracker with no accounts, no feed, and no database of you. The link is the data." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hashshelf.com/about.html" />
+    <meta name="theme-color" content="#fcfbf8" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cstyle%3E.i%7Bfill:%23191817%7D@media(prefers-color-scheme:dark)%7B.i%7Bfill:%23e9e5dc%7D%7D%3C/style%3E%3Crect class='i' x='21' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='38' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='8' y='25' width='48' height='4.5' rx='1.5'/%3E%3Crect class='i' x='8' y='42' width='48' height='4.5' rx='1.5'/%3E%3Crect x='29' y='14' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3Crect x='12' y='16' width='4' height='9' rx='1' fill='%23c23b22'/%3E%3Crect x='47' y='31' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .about { max-width: 640px; margin: 0 auto; padding: 8px 20px 72px; }
+      .about h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 34px 0 6px; }
+      .about .kicker {
+        font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--red);
+      }
+      .about h2 {
+        font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; font-family: var(--mono);
+        margin: 40px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+      }
+      .about p { font-family: var(--serif); font-size: 17px; line-height: 1.65; margin: 0 0 14px; }
+      .about p code { font-family: var(--mono); font-size: 14px; }
+      .rules { margin: 0; padding: 0; list-style: none; }
+      .rules li {
+        font-family: var(--serif); font-size: 17px; line-height: 1.55;
+        padding: 12px 0 12px 2px; border-bottom: 1px solid var(--rule);
+        display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: baseline;
+      }
+      .rules li:first-child { border-top: 1px solid var(--rule); }
+      .rules .no {
+        font-family: var(--mono); font-size: 11px; color: var(--red); letter-spacing: .08em;
+      }
+      .small { font-family: var(--mono); font-size: 11.5px; color: var(--muted); line-height: 1.7; }
+      .backlink { display: inline-block; margin-top: 34px; }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="/" style="text-decoration:none;color:inherit">
+        <svg class="logo-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <rect x="21" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="38" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="25" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="42" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="29" y="14" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="12" y="16" width="4" height="9" rx="1" fill="#c23b22"/>
+          <rect x="47" y="31" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="29.5" y="33" width="4" height="9" rx="1" fill="#c23b22" transform="rotate(8 31.5 37)"/>
+        </svg>
+        <span class="title">HashShelf</span>
+      </a>
+      <div class="header-actions"><a class="link" href="/">Your shelf</a></div>
+    </header>
+
+    <main class="about">
+      <div class="kicker">About</div>
+      <h1>A book tracker that refuses to know you.</h1>
+
+      <p>HashShelf keeps your reading list — what you've finished, what you're reading,
+      what you rated it — and turns the whole thing into a single link. Send that link
+      to a friend and they see your shelf. That's the entire product.</p>
+
+      <h2>The idea</h2>
+      <p>Every book site wants the same three things before you can write down a title:
+      an account, an email, a feed to keep you scrolling. That always seemed backwards.
+      A reading list is closer to a scrap of paper than a social profile — you should be
+      able to hand it to someone the way you'd hand over a note.</p>
+      <p>So HashShelf stores your shelf <em>in the link itself</em>. The letters after
+      the <code>#</code> in a HashShelf URL aren't a lookup code for a record about you
+      on a server somewhere — they <em>are</em> your books, compressed and checksummed.
+      Decode them and the shelf comes back, byte for byte, on any device, forever.
+      If HashShelf-the-website vanished tomorrow, every link ever shared would still
+      contain every book it ever held.</p>
+
+      <h2>The rules</h2>
+      <ul class="rules">
+        <li><span class="no">01</span><span>No accounts. There is nothing to sign up for and nothing to be locked out of.</span></li>
+        <li><span class="no">02</span><span>No feed. Your shelf is shown to people you hand it to, and no one else.</span></li>
+        <li><span class="no">03</span><span>No analytics scripts, no ad pixels, no tracking. The page you load is the page there is.</span></li>
+        <li><span class="no">04</span><span>The link is the data. Our server keeps only a cache of public book facts and copies of shelves people chose to shorten — none of it tied to a person.</span></li>
+        <li><span class="no">05</span><span>If buy links appear next to books, they're affiliate links and they're disclosed. That's the entire business model — no exceptions, and never your data, because we don't have any.</span></li>
+      </ul>
+
+      <h2>Who's behind it</h2>
+      <p>"Us" is, in the grand tradition of the small web, mostly one person with a
+      reading pile that outruns their finishing speed. HashShelf is a side project made
+      with care, run on modest hardware, and kept deliberately small — the features it
+      grows (importing your Goodreads library, comparing shelves with a friend, a
+      year-in-review card) all have to pass the same test: does it work without knowing
+      who you are?</p>
+
+      <h2>Sources &amp; thanks</h2>
+      <p>Titles, authors, covers, and subjects come from
+      <a class="link" href="https://openlibrary.org" rel="noopener">Open Library</a>,
+      an initiative of the Internet Archive building a catalog of every book ever
+      published. HashShelf caches politely, credits gladly, and encourages you to
+      support them.</p>
+
+      <p class="small">Corrections and ideas: the project is small enough that shouting
+      into the void occasionally works. If a book hydrates wrong, it's almost always the
+      upstream record — give it a day and try again.</p>
+
+      <a class="link backlink" href="/">&larr; Back to your shelf</a>
+    </main>
+  </body>
+</html>
