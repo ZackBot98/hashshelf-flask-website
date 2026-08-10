@@ -56,7 +56,8 @@ index.html         SPA shell (editor + viewer + compare + wrapped modal)
 styles.css         Dark theme + layout
 snapshot.js        Canonicalize + deflate + base64url + SHA-256 integrity
 openlibrary.js     Metadata hydration: API-first with direct-OpenLibrary fallback
-lib.js             Pure logic: CSV import, genre mapping, compare, wrapped card
+config.js          Affiliate ids (public by design) — the only file to edit to go live
+lib.js             Pure logic: CSV import, genre mapping, compare, wrapped card, buy links
 ui.js              Rendering, events, shelves, filters, clipboard, live hash
 genres.json        Genre rules, shared by server.py and lib.js
 service-worker.js  Asset + API cache (7d TTL), offline support
@@ -116,6 +117,22 @@ The repo contains a `render.yaml` blueprint: Render → New → Blueprint → co
 ### Static hosting (Cloudflare Pages, GitHub Pages, Netlify…)
 
 Still fully supported — publish the repo root as-is. Everything works except short links and per-shelf link previews (the client hydrates straight from OpenLibrary).
+
+## Affiliate links
+
+Buy links are off until an id is set in [`config.js`](config.js). With one set,
+each book row gets a small "Buy" link and the required disclosure appears in the
+footer; with none set, neither renders and the page is byte-identical to before.
+
+- Amazon links use the ISBN-10 (which is the ASIN for print books), derived from
+  the ISBN-13 when needed; 979-prefixed ISBNs and books with no ISBN fall back to
+  a search link that still carries attribution.
+- Books added by *work* id have no ISBN of their own, so hydration stores a
+  representative English-edition ISBN (`work_editions.en_isbn`) — this is what
+  lets every book link out, not just ISBN-added ones.
+- Links carry `rel="sponsored nofollow noopener noreferrer"` and open in a new tab.
+- No tracking scripts are added: these are plain outbound URLs, so the
+  no-analytics, no-accounts posture is unchanged.
 
 ## Security & privacy
 

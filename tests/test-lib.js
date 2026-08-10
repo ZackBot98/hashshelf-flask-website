@@ -107,6 +107,47 @@ const check = (name, cond, extra) => {
   check('stats covers', stats.covers.length === 2);
   check('stats rating distribution', stats.dist[5] === 1 && stats.dist[4] === 1);
 
+  // --- ISBN conversion (Amazon ASIN = ISBN-10) ----------------------------
+  check('isbn13 -> isbn10 (978)', L.toIsbn10('9780547928241') === '0547928246', L.toIsbn10('9780547928241'));
+  check('isbn10 passthrough', L.toIsbn10('0547928246') === '0547928246');
+  check('isbn10 -> isbn13', L.toIsbn13('0547928246') === '9780547928241', L.toIsbn13('0547928246'));
+  check('isbn13 passthrough', L.toIsbn13('9780547928241') === '9780547928241');
+  check('X check digit preserved', L.toIsbn10('014044913X') === '014044913X');
+  check('isbn10 with X -> isbn13', L.toIsbn13('014044913X') === '9780140449136', L.toIsbn13('014044913X'));
+  check('979 has no isbn10', L.toIsbn10('9791234567896') === null);
+  check('hyphens tolerated', L.toIsbn10('978-0-547-92824-1') === '0547928246');
+  check('garbage -> null', L.toIsbn10('nope') === null && L.toIsbn13('') === null);
+
+  // --- affiliate links ----------------------------------------------------
+  const meta = { title: 'The Hobbit', isbn: '9780547928241' };
+  check('no config -> no links', L.buyLinks(meta, {}).length === 0);
+  check('affiliateActive false when unset', L.affiliateActive({}) === false);
+  check('affiliateActive true with amazon tag', L.affiliateActive({ amazonTag: 'x-20' }) === true);
+
+  const amz = L.buyLinks(meta, { amazonTag: 'hashshelf-20' });
+  check('amazon link uses ASIN + tag',
+    amz.length === 1 && amz[0].url === 'https://www.amazon.com/dp/0547928246?tag=hashshelf-20', amz);
+
+  const amz979 = L.buyLinks({ title: 'New Book', isbn: '9791234567896' }, { amazonTag: 'hashshelf-20' });
+  check('979 falls back to search link',
+    amz979[0].url.includes('/s?k=9791234567896') && amz979[0].url.includes('tag=hashshelf-20'), amz979);
+
+  const amzNoIsbn = L.buyLinks({ title: 'Some Title', isbn: null }, { amazonTag: 'hashshelf-20' });
+  check('no isbn falls back to title search',
+    amzNoIsbn[0].url.includes('/s?k=Some%20Title'), amzNoIsbn);
+
+  check('no isbn and no title -> no link',
+    L.buyLinks({ title: '', isbn: null }, { amazonTag: 'hashshelf-20' }).length === 0);
+
+  const both = L.buyLinks(meta, { amazonTag: 'hashshelf-20', bookshopId: '12345' });
+  check('both programs render', both.length === 2 && both[1].url === 'https://bookshop.org/a/12345/9780547928241', both);
+
+  const host = L.buyLinks(meta, { amazonTag: 't-21', amazonHost: 'www.amazon.co.uk' });
+  check('custom marketplace host', host[0].url.startsWith('https://www.amazon.co.uk/dp/'), host);
+
+  const evil = L.buyLinks(meta, { amazonTag: 'a b&c=d' });
+  check('tag is url-encoded', evil[0].url.includes('tag=a%20b%26c%3Dd'), evil[0].url);
+
   // --- ISBN cleaner -------------------------------------------------------
   check('isbn cleaner: excel guard', L.cleanIsbn('="9780547928241"') === '9780547928241');
   check('isbn cleaner: X check digit', L.cleanIsbn('014044913x') === '014044913X');

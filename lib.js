@@ -138,6 +138,87 @@
       .map(([g]) => g);
   }
 
+  // ------------------------------------------------------------ affiliate
+
+  function isbnDigits(value) {
+    return String(value || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  }
+
+  function isbn10CheckDigit(nine) {
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += (i + 1) * Number(nine[i]);
+    const check = sum % 11;
+    return check === 10 ? 'X' : String(check);
+  }
+
+  function isbn13CheckDigit(twelve) {
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += Number(twelve[i]) * (i % 2 === 0 ? 1 : 3);
+    return String((10 - (sum % 10)) % 10);
+  }
+
+  // Amazon's ASIN for a print book is its ISBN-10. Only 978-prefixed ISBN-13s
+  // convert; 979-prefixed ones have no ISBN-10 equivalent.
+  function toIsbn10(value) {
+    const s = isbnDigits(value);
+    if (s.length === 10) return s;
+    if (s.length === 13 && s.startsWith('978')) {
+      const nine = s.slice(3, 12);
+      return nine + isbn10CheckDigit(nine);
+    }
+    return null;
+  }
+
+  function toIsbn13(value) {
+    const s = isbnDigits(value);
+    if (s.length === 13) return s;
+    if (s.length === 10) {
+      const twelve = '978' + s.slice(0, 9);
+      return twelve + isbn13CheckDigit(twelve);
+    }
+    return null;
+  }
+
+  // Returns [{label, url}] for whichever programs are configured. Empty when
+  // none are, which is what keeps buy links off the page by default.
+  function buyLinks(meta, config) {
+    const cfg = config || {};
+    const out = [];
+    const isbn = meta && meta.isbn;
+    const title = (meta && meta.title) || '';
+
+    if (cfg.amazonTag) {
+      const host = cfg.amazonHost || 'www.amazon.com';
+      const tag = encodeURIComponent(cfg.amazonTag);
+      const asin = toIsbn10(isbn);
+      if (asin) {
+        out.push({ label: 'Amazon', url: `https://${host}/dp/${asin}?tag=${tag}` });
+      } else {
+        // No ISBN-10 (979-prefixed, or no ISBN at all): a search link still
+        // carries attribution.
+        const q = encodeURIComponent(isbnDigits(isbn) || title);
+        if (q) out.push({ label: 'Amazon', url: `https://${host}/s?k=${q}&tag=${tag}` });
+      }
+    }
+
+    if (cfg.bookshopId) {
+      const isbn13 = toIsbn13(isbn);
+      const id = encodeURIComponent(cfg.bookshopId);
+      if (isbn13) {
+        out.push({ label: 'Bookshop', url: `https://bookshop.org/a/${id}/${isbn13}` });
+      } else if (title) {
+        out.push({ label: 'Bookshop', url: `https://bookshop.org/beta-search?keywords=${encodeURIComponent(title)}&affiliate=${id}` });
+      }
+    }
+
+    return out;
+  }
+
+  function affiliateActive(config) {
+    const cfg = config || {};
+    return !!(cfg.amazonTag || cfg.bookshopId);
+  }
+
   // -------------------------------------------------------------- compare
 
   // Prefer the OpenLibrary work id so an ISBN entry and a work entry for the
@@ -415,6 +496,10 @@
     parseGoodreadsCsv,
     cleanIsbn,
     normalizeGenres,
+    toIsbn10,
+    toIsbn13,
+    buyLinks,
+    affiliateActive,
     identityKey,
     compareShelves,
     buildStats,

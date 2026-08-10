@@ -267,10 +267,12 @@
     const comment = document.createElement('div');
     comment.className = 'authors';
     comment.textContent = b.comment || '';
+    const buy = document.createElement('div');
+    buy.className = 'buy-links';
     tags.append(rating, status, genres);
-    meta.append(title, authors, tags, comment);
+    meta.append(title, authors, tags, comment, buy);
     item.append(cover, meta);
-    return { item, coverEl: cover, titleEl: title, authorsEl: authors, genresEl: genres };
+    return { item, coverEl: cover, titleEl: title, authorsEl: authors, genresEl: genres, buyEl: buy };
   }
 
   function paintMeta(slot, m) {
@@ -284,6 +286,20 @@
         chip.className = 'tag genre';
         chip.textContent = g;
         slot.genresEl.appendChild(chip);
+      }
+    }
+    if (slot.buyEl) {
+      slot.buyEl.innerHTML = '';
+      for (const link of HashShelfLib.buyLinks(m, window.HashShelfConfig)) {
+        const a = document.createElement('a');
+        a.className = 'buy-link';
+        a.href = link.url;
+        a.target = '_blank';
+        // sponsored+nofollow is required by the affiliate programs; noopener
+        // keeps the new tab from touching this page
+        a.rel = 'sponsored nofollow noopener noreferrer';
+        a.textContent = link.label;
+        slot.buyEl.appendChild(a);
       }
     }
   }
@@ -1093,6 +1109,12 @@
   }
 
   function init() {
+    // Affiliate disclosure is required whenever buy links are live, and must
+    // not appear when they are not.
+    const disclosure = $('#affiliateDisclosure');
+    if (disclosure && HashShelfLib.affiliateActive(window.HashShelfConfig)) {
+      disclosure.classList.remove('is-hidden');
+    }
     try {
       const savedName = localStorage.getItem(LS_NAME);
       if (savedName && displayName) displayName.value = savedName;

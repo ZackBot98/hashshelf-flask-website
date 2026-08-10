@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -51,7 +51,7 @@ ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
 
 STATIC_FILES = {
     "index.html", "styles.css", "ui.js", "lib.js", "snapshot.js", "openlibrary.js",
-    "service-worker.js", "manifest.json", "genres.json", "robots.txt",
+    "service-worker.js", "manifest.json", "genres.json", "robots.txt", "config.js",
 }
 STATIC_DIRS = ("vendor/", "icons/")
 
@@ -129,7 +129,7 @@ def init_db():
         );
         CREATE TABLE IF NOT EXISTS work_editions (
           work_id TEXT PRIMARY KEY, en_title TEXT, en_cover_id INTEGER,
-          fetched_at INTEGER NOT NULL
+          en_isbn TEXT, fetched_at INTEGER NOT NULL
         );
         CREATE TABLE IF NOT EXISTS searches (
           q TEXT PRIMARY KEY, results TEXT NOT NULL, fetched_at INTEGER NOT NULL
@@ -142,11 +142,15 @@ def init_db():
     )
     # Columns added after v1.2.0; CREATE TABLE IF NOT EXISTS won't backfill them
     have = {r[1] for r in conn.execute("PRAGMA table_info(books)")}
-    for col in ("genres", "work_id"):
+    for col in ("genres", "work_id", "isbn"):
         if col not in have:
             conn.execute(f"ALTER TABLE books ADD COLUMN {col} TEXT")
             # Existing rows predate the column; expire them so they re-hydrate
             conn.execute("UPDATE books SET fetched_at = 0")
+    have_we = {r[1] for r in conn.execute("PRAGMA table_info(work_editions)")}
+    if "en_isbn" not in have_we:
+        conn.execute("ALTER TABLE work_editions ADD COLUMN en_isbn TEXT")
+        conn.execute("UPDATE work_editions SET fetched_at = 0")
     conn.commit()
     conn.close()
 
@@ -252,15 +256,25 @@ def _author_names(author_refs):
     return names
 
 
+def _edition_isbn(ed):
+    """Prefer ISBN-13 (universal); ISBN-10 converts to it losslessly client-side."""
+    for field in ("isbn_13", "isbn_10"):
+        for value in ed.get(field) or []:
+            cleaned = re.sub(r"[^0-9Xx]", "", str(value)).upper()
+            if len(cleaned) in (10, 13):
+                return cleaned
+    return None
+
+
 def get_english_edition_pick(work_id):
-    """Best English edition (title, cover id) for a work, cached including misses."""
+    """Best English edition (title, cover, isbn) for a work, cached including misses."""
     row = db().execute(
-        "SELECT en_title, en_cover_id, fetched_at FROM work_editions WHERE work_id=?",
+        "SELECT en_title, en_cover_id, fetched_at, en_isbn FROM work_editions WHERE work_id=?",
         (work_id,),
     ).fetchone()
     if row and _fresh(row[2], BOOK_TTL):
-        return row[0], row[1]
-    en_title, en_cover = None, None
+        return row[0], row[1], row[3]
+    en_title, en_cover, en_isbn = None, None, None
     try:
         data = ol_get(f"/works/{work_id}/editions.json", params={"limit": 100})
         for ed in data.get("entries") or []:
@@ -271,18 +285,21 @@ def get_english_edition_pick(work_id):
             covers = ed.get("covers") or []
             if covers and not en_cover:
                 en_cover = covers[0]
-            if en_title and en_cover:
+            if not en_isbn:
+                en_isbn = _edition_isbn(ed)
+            if en_title and en_cover and en_isbn:
                 break
     except Exception:
         if row:
-            return row[0], row[1]
+            return row[0], row[1], row[3]
         raise
     db().execute(
-        "INSERT OR REPLACE INTO work_editions (work_id, en_title, en_cover_id, fetched_at) VALUES (?,?,?,?)",
-        (work_id, en_title, en_cover, int(time.time())),
+        "INSERT OR REPLACE INTO work_editions (work_id, en_title, en_cover_id, en_isbn, fetched_at)"
+        " VALUES (?,?,?,?,?)",
+        (work_id, en_title, en_cover, en_isbn, int(time.time())),
     )
     db().commit()
-    return en_title, en_cover
+    return en_title, en_cover, en_isbn
 
 
 def cover_url(cover_id):
@@ -317,12 +334,14 @@ def hydrate_work(work_id, _depth=0):
     covers = data.get("covers") or []
     cover = covers[0] if covers else None
     canonical = re.sub(r"^/works/", "", str(data.get("key") or "")) or work_id
+    isbn = None
     try:
-        en_title, en_cover = get_english_edition_pick(canonical)
+        en_title, en_cover, en_isbn = get_english_edition_pick(canonical)
         if en_title:
             title = en_title
         if en_cover:
             cover = en_cover
+        isbn = en_isbn
     except Exception:
         pass
     return {
@@ -331,6 +350,8 @@ def hydrate_work(work_id, _depth=0):
         "coverUrl": cover_url(cover),
         "genres": normalize_genres(_subject_strings(data)),
         "workId": canonical,
+        # Representative edition ISBN so work-added books can still link out
+        "isbn": isbn,
     }
 
 
@@ -366,16 +387,23 @@ def hydrate_edition(id_or_isbn, _depth=0):
             if not authors:
                 authors = parent.get("authors") or []
 
+    # An ISBN-typed id is itself the ISBN; otherwise read it off the edition
+    isbn = re.sub(r"[^0-9Xx]", "", str(id_or_isbn)).upper()
+    if len(isbn) not in (10, 13):
+        isbn = _edition_isbn(data)
+
     return {
         "title": title,
         "authors": authors,
         "coverUrl": cover_url(covers[0] if covers else None),
         "genres": genres,
         "workId": work_id,
+        "isbn": isbn,
     }
 
 
-_BOOK_COLS = "SELECT title, authors, cover_url, fetched_at, genres, work_id FROM books WHERE id_type=? AND id=?"
+_BOOK_COLS = ("SELECT title, authors, cover_url, fetched_at, genres, work_id, isbn"
+              " FROM books WHERE id_type=? AND id=?")
 
 
 def _row_to_book(row):
@@ -385,6 +413,7 @@ def _row_to_book(row):
         "coverUrl": row[2],
         "genres": json.loads(row[4]) if row[4] else [],
         "workId": row[5],
+        "isbn": row[6],
         "ok": True,
     }
 
@@ -403,10 +432,11 @@ def get_book(id_type, book_id):
         try:
             value = hydrate_work(book_id) if id_type == "work" else hydrate_edition(book_id)
             db().execute(
-                "INSERT OR REPLACE INTO books (id_type, id, title, authors, cover_url, genres, work_id, fetched_at)"
-                " VALUES (?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO books"
+                " (id_type, id, title, authors, cover_url, genres, work_id, isbn, fetched_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
                 (id_type, book_id, value["title"], json.dumps(value["authors"]), value["coverUrl"],
-                 json.dumps(value["genres"]), value["workId"], int(time.time())),
+                 json.dumps(value["genres"]), value["workId"], value.get("isbn"), int(time.time())),
             )
             db().commit()
             return {**value, "ok": True}
@@ -414,7 +444,7 @@ def get_book(id_type, book_id):
             log.warning("hydration failed for %s:%s", id_type, book_id, exc_info=True)
             if row:
                 return _row_to_book(row)
-            return {"title": None, "authors": [], "coverUrl": None, "genres": [], "workId": None, "ok": False}
+            return {"title": None, "authors": [], "coverUrl": None, "genres": [], "workId": None, "isbn": None, "ok": False}
 
 
 # ----------------------------------------------------------------- routes
@@ -446,7 +476,7 @@ def api_books():
         except Exception:
             log.warning("book task failed for %s:%s", id_type, book_id, exc_info=True)
             out[f"{id_type}:{book_id}"] = {
-                "title": None, "authors": [], "coverUrl": None, "genres": [], "workId": None, "ok": False
+                "title": None, "authors": [], "coverUrl": None, "genres": [], "workId": None, "isbn": None, "ok": False
             }
     resp = jsonify({"books": out})
     resp.headers["Cache-Control"] = "no-store"
@@ -495,7 +525,7 @@ def api_search():
         if not m:
             continue
         try:
-            en_title, en_cover = get_english_edition_pick(m.group(1))
+            en_title, en_cover, _ = get_english_edition_pick(m.group(1))
             if en_title:
                 d["en_title"] = en_title
             if en_cover:

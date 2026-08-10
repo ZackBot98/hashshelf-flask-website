@@ -115,6 +115,14 @@ button:disabled { opacity: 0.6; cursor: default; }
 .genre-tags { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .tag.genre { color: var(--accent); border-color: rgba(79,140,255,0.35); background: rgba(79,140,255,0.08); }
 
+/* Affiliate buy links */
+.buy-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.buy-links:empty { display: none; }
+.buy-link { font-size: 13px; color: var(--muted); text-decoration: none; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.buy-link:hover { color: var(--text); border-color: var(--accent); background: rgba(79,140,255,0.10); }
+
+.site-footer { max-width: 1100px; margin: 8px auto 24px; padding: 0 18px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
 /* Compare */
 .compare-form { display: grid; gap: 12px; justify-items: start; }
 .compare-form label { width: 100%; }

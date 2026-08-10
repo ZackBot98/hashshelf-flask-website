@@ -1,6 +1,6 @@
 (function() {
-  // v2: cached shape gained genres/workId, so old entries must not be reused
-  const CACHE_PREFIX = "bookCache2";
+  // v3: cached shape gained isbn (affiliate links); older entries lack it
+  const CACHE_PREFIX = "bookCache3";
   const DAY_MS = 24 * 60 * 60 * 1000;
   const TTL_MS = 7 * DAY_MS;
   const API_TIMEOUT_MS = 6000;
@@ -100,6 +100,16 @@
     return null;
   }
 
+  function editionIsbn(ed) {
+    for (const field of ['isbn_13', 'isbn_10']) {
+      for (const v of ed?.[field] || []) {
+        const cleaned = String(v).replace(/[^0-9Xx]/g, '').toUpperCase();
+        if (cleaned.length === 10 || cleaned.length === 13) return cleaned;
+      }
+    }
+    return null;
+  }
+
   function subjectStrings(data) {
     const out = [];
     for (const field of ['subjects', 'subject_places', 'subject_times']) {
@@ -119,6 +129,7 @@
     let title = data?.title || `Work ${id}`;
     const authors = await fetchAuthorNames(data?.authors);
     let cover = Array.isArray(data?.covers) ? data.covers[0] : null;
+    let isbn = null;
     const canonical = String(data?.key || '').replace(/^\/works\//, '') || id;
     try {
       const url = `https://openlibrary.org/works/${encodeURIComponent(canonical)}/editions.json?limit=100`;
@@ -128,6 +139,7 @@
         if (engEd.title) title = engEd.title;
         const edCovers = Array.isArray(engEd.covers) ? engEd.covers : [];
         if (edCovers.length) cover = edCovers[0];
+        isbn = editionIsbn(engEd);
       }
     } catch {}
     return {
@@ -135,7 +147,8 @@
       authors,
       coverUrl: toCoverUrl(cover),
       genres: await genresFor(data),
-      workId: canonical
+      workId: canonical,
+      isbn
     };
   }
 
@@ -163,13 +176,15 @@
         if (!authors.length) authors = await fetchAuthorNames(parent?.authors);
       } catch {}
     }
-    return { title, authors, coverUrl: toCoverUrl(cover), genres, workId };
+    const cleaned = String(idOrIsbn).replace(/[^0-9Xx]/g, '').toUpperCase();
+    const isbn = (cleaned.length === 10 || cleaned.length === 13) ? cleaned : editionIsbn(data);
+    return { title, authors, coverUrl: toCoverUrl(cover), genres, workId, isbn };
   }
 
   async function hydrateDirect(idType, id) {
     if (idType === "work") return hydrateWork(id);
     if (idType === "isbn" || idType === "edition") return hydrateEdition(id);
-    return { title: `${idType}:${id}`, authors: [], coverUrl: null, genres: [], workId: null };
+    return { title: `${idType}:${id}`, authors: [], coverUrl: null, genres: [], workId: null, isbn: null };
   }
 
   // ---------------------------------------------------------------------
@@ -217,7 +232,8 @@
           authors: hit.authors || [],
           coverUrl: hit.coverUrl || null,
           genres: hit.genres || [],
-          workId: hit.workId || null
+          workId: hit.workId || null,
+          isbn: hit.isbn || null
         };
         writeCached(item.idType, item.id, value);
         item.resolve(value);
@@ -246,7 +262,7 @@
         writeCached(idType, id, value); // only successes are cached
         return value;
       } catch {
-        return { title: `${idType.toUpperCase()}: ${id}`, authors: [], coverUrl: null, genres: [], workId: null };
+        return { title: `${idType.toUpperCase()}: ${id}`, authors: [], coverUrl: null, genres: [], workId: null, isbn: null };
       }
     })().finally(() => inflight.delete(key));
 

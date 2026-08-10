@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hashshelf-cache-v41';
+const CACHE_NAME = 'hashshelf-cache-v42';
 const API_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ASSETS = [
   '/',
@@ -6,6 +6,7 @@ const ASSETS = [
   '/styles.css',
   '/snapshot.js',
   '/openlibrary.js',
+  '/config.js',
   '/lib.js',
   '/ui.js',
   '/manifest.json',

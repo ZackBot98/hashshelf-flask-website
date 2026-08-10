@@ -141,7 +141,7 @@ def fake_ol(routes):
 WORK_ROUTES = {
     "/works/OL900W/editions": {"entries": [
         {"languages": [{"key": "/languages/eng"}], "title": "English Title",
-         "covers": [42], "isbn_13": ["9780000000001"]},
+         "covers": [42], "isbn_13": ["978-0-00-000000-1"]},
     ]},
     "/works/OL900W": {"key": "/works/OL900W", "title": "Original Title",
                       "subjects": ["Science fiction", "American Science fiction"],
@@ -188,6 +188,8 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(book["workId"], "OL900W")
         self.assertIn("Science Fiction", book["genres"])
         self.assertIn("/b/id/42-M.jpg", book["coverUrl"])
+        # representative ISBN, punctuation stripped, so work-added books can link out
+        self.assertEqual(book["isbn"], "9780000000001")
         # cached: upstream now unreachable, result must still come back
         with mock.patch.object(server, "ol_get", side_effect=RuntimeError("no upstream")):
             r2 = self.client.post("/api/books", json={"books": [{"idType": "work", "id": "OL900W"}]})
@@ -223,6 +225,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(book["authors"], ["Test Author"])    # borrowed from work
         self.assertIn("Fantasy", book["genres"])              # borrowed from work
         self.assertEqual(book["workId"], "OL902W")
+        self.assertEqual(book["isbn"], "9780000000002")       # the id itself is the ISBN
         # the parent work row was warmed into the cache as a side effect
         with mock.patch.object(server, "ol_get", side_effect=RuntimeError("no upstream")):
             r2 = self.client.post("/api/books", json={"books": [{"idType": "work", "id": "OL902W"}]})
