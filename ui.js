@@ -1141,7 +1141,10 @@
     renderEditorList();
     initEvents();
 
-    const boot = typeof window.__HASHSHELF_SNAPSHOT__ === 'string' ? window.__HASHSHELF_SNAPSHOT__ : '';
+    // Short-link (/s/<slug>) pages carry the snapshot in a <meta> tag the
+    // server injects — a meta, not an inline script, so the strict CSP allows it.
+    const bootMeta = document.querySelector('meta[name="hashshelf-snapshot"]');
+    const boot = bootMeta ? (bootMeta.getAttribute('content') || '') : '';
     const hash = location.hash || '';
     if (hash && !isOwnHash(hash)) {
       loadSnapshotHash(hash);           // someone else's snapshot link

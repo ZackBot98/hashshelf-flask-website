@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.7"
+APP_VERSION = "1.5.8"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -798,9 +798,12 @@ def snapshot_page(slug):
     page = re.sub(
         r'(<meta property="og:url" content=")[^"]*(")',
         rf"\g<1>{html.escape(request.base_url)}\g<2>", page, count=1)
-    # payload alphabet is [A-Za-z0-9_.-], safe to inline verbatim
-    bootstrap = f'<script>window.__HASHSHELF_SNAPSHOT__="#{payload}";</script>'
-    page = page.replace("<script", bootstrap + "\n    <script", 1)
+    # Hand the snapshot to the app via a <meta> tag, NOT an inline <script>:
+    # the strict CSP (script-src 'self') blocks inline scripts, so an inline
+    # bootstrap silently fails and the short link renders nothing. The payload
+    # alphabet is [A-Za-z0-9_.-]; escape anyway as defense in depth.
+    bootstrap = f'<meta name="hashshelf-snapshot" content="#{html.escape(payload, quote=True)}" />'
+    page = page.replace("</head>", "    " + bootstrap + "\n  </head>", 1)
     return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600"}
 
 

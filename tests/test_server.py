@@ -362,12 +362,27 @@ class SnapshotEndpointTests(unittest.TestCase):
         got = self.client.get(f"/api/snapshot/{slug}")
         self.assertEqual(got.get_json()["payload"], payload)
 
+    def test_s_page_snapshot_is_csp_safe(self):
+        # QA-found (v1.5.8): the snapshot bootstrap must be a <meta> tag, not an
+        # inline <script> — the strict CSP (script-src 'self') blocks inline
+        # scripts, which silently broke every short link. Guard both invariants.
+        payload = make_payload(VALID_SNAPSHOT)
+        slug = self.client.post("/api/snapshot", json={"payload": payload}).get_json()["slug"]
+        page = self.client.get(f"/s/{slug}").get_data(as_text=True)
+        self.assertIn('name="hashshelf-snapshot"', page)
+        self.assertIn(f'content="#{payload}"', page)
+        # zero inline scripts anywhere on the page (every <script> must have src=)
+        import re as _re
+        for tag in _re.findall(r"<script\b[^>]*>", page):
+            self.assertIn("src=", tag, f"inline script would be CSP-blocked: {tag}")
+        self.assertNotIn("__HASHSHELF_SNAPSHOT__", page)
+
     def test_og_injection_and_name_escaping(self):
         snap = {"v": 1, "name": 'Zack <script>alert(1)</script>', "books": []}
         payload = make_payload(snap)
         slug = self.client.post("/api/snapshot", json={"payload": payload}).get_json()["slug"]
         page = self.client.get(f"/s/{slug}").get_data(as_text=True)
-        self.assertIn("__HASHSHELF_SNAPSHOT__", page)
+        self.assertIn('name="hashshelf-snapshot"', page)       # meta bootstrap
         self.assertIn("&lt;script&gt;", page)                  # escaped
         self.assertNotIn("Zack <script>", page)                # never raw
         self.assertIn("og:title", page)
