@@ -62,7 +62,7 @@ const check = (name, cond, extra) => {
   check('comment: blocks WWW. any case', L.commentHasUrl('see WWW.evil.example'));
   check('comment: allows bare domains (real notes cite archive.org)', !L.commentHasUrl('found on archive.org'));
   check('comment: ordinary text fine', !L.commentHasUrl('Loved it. 4.5 stars, Vol. 2 was better'));
-  check('name: blocks bare domains (unfurl title surface)', L.nameHasUrl('great deals at evil.com'));
+  check('name: blocks bare domains (kept link-free)', L.nameHasUrl('great deals at evil.com'));
   check('name: blocks www forms', L.nameHasUrl('www.evil.example picks'));
   check('name: blocks file-lookalike .zip TLD', L.nameHasUrl('invoice.zip'));
   check('name: blocks .mov TLD', L.nameHasUrl('watch demo.mov'));

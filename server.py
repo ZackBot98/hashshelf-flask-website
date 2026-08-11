@@ -6,16 +6,14 @@ Serves the static app plus a small API:
                       so OpenLibrary is hit at most once per book per TTL
   GET  /api/search    cached OpenLibrary search proxy with English-edition
                       title/cover enrichment done server-side
-  POST /api/snapshot  content-addressed snapshot storage -> short link slug
-  GET  /s/<slug>      serves the app with per-shelf OG tags + inlined snapshot
   GET  /healthz       health check for Render
 
-Design invariant: the URL hash remains the source of truth. Everything in the
-DB is either a cache of OpenLibrary (disposable) or a copy of a snapshot whose
-canonical form still lives in the long link. Losing the DB never loses data.
+Design invariant: the URL hash is the source of truth and the only place shelf
+data lives. The server stores NO user content — the database is purely a
+disposable OpenLibrary cache. Shelves are shared as self-contained links whose
+data rides in the URL fragment, which browsers never send to the server.
 """
 
-import html
 import json
 import logging
 import os
@@ -23,16 +21,12 @@ import re
 import sqlite3
 import threading
 import time
-import zlib
-from base64 import urlsafe_b64decode
 from concurrent.futures import ThreadPoolExecutor
-from hashlib import sha256
 
 import requests
-from collections import deque
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.7.0"
+APP_VERSION = "1.8.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -42,32 +36,9 @@ OL_BASE = "https://openlibrary.org"
 BOOK_TTL = 60 * 86400      # assembled book metadata is very stable
 SEARCH_TTL = 1 * 86400
 MAX_BOOKS_PER_REQUEST = 200
-MAX_SNAPSHOT_PAYLOAD = 32 * 1024      # base64url chars; far beyond usable URL length
-MAX_SNAPSHOT_INFLATED = 512 * 1024
-MAX_SNAPSHOT_BOOKS = 1000
 
 ALLOWED_ID_TYPES = {"work", "isbn", "edition"}
-ALLOWED_STATUSES = {"want", "reading", "finished", "did not finish"}
 ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
-
-# Abuse controls: stored shelves are link-free text, so a hashshelf.com page can
-# never deliver someone else's URL. Comments reject pasteable link forms; names
-# are stricter (they become the unfurl title on /s/ pages, borrowing this
-# domain's credibility) and also reject bare domains. Mirrored in lib.js —
-# keep the two in sync so anything addable stays shortenable.
-URL_IN_TEXT_RE = re.compile(r"(?:https?://|ftp://|www\.)", re.I)
-# Bare-domain TLDs to reject in shelf names (names become the unfurl title).
-# Covers the common generics/ccTLDs plus the abuse-heavy set: file-lookalikes
-# (.zip/.mov), cheap phishing generics (.icu/.sbs/.cfd/.lol/...), and the
-# country codes an abuser reaches for first. Not exhaustive by design — the
-# real guarantee is that stored text is never clickable; this is spam friction.
-_BARE_TLDS = (
-    "com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|"
-    "cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|"
-    "monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|"
-    "website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su"
-)
-BARE_DOMAIN_RE = re.compile(rf"\b[a-z0-9-]+\.(?:{_BARE_TLDS})\b", re.I)
 
 STATIC_FILES = {
     "index.html", "about.html", "guide.html", "terms.html", "privacy.html",
@@ -156,13 +127,12 @@ def init_db():
         CREATE TABLE IF NOT EXISTS searches (
           q TEXT PRIMARY KEY, results TEXT NOT NULL, fetched_at INTEGER NOT NULL
         );
-        CREATE TABLE IF NOT EXISTS snapshots (
-          slug TEXT PRIMARY KEY, digest TEXT NOT NULL, payload TEXT NOT NULL,
-          name TEXT, book_count INTEGER NOT NULL, created_at INTEGER NOT NULL
-        );
         CREATE TABLE IF NOT EXISTS prewarm_state (
           k TEXT PRIMARY KEY, v TEXT NOT NULL
         );
+        -- HashShelf stores no user content. Short links (the old `snapshots`
+        -- table) were removed; drop it so no shared shelf is ever retained.
+        DROP TABLE IF EXISTS snapshots;
         """
     )
     # Columns added after v1.2.0; CREATE TABLE IF NOT EXISTS won't backfill them
@@ -701,189 +671,9 @@ def api_search():
     return resp
 
 
-def _validate_snapshot_payload(payload):
-    """payload is '<base64url>.<12 hex>'. Returns (digest_hex, name, book_count)."""
-    if not isinstance(payload, str) or len(payload) > MAX_SNAPSHOT_PAYLOAD:
-        abort(400, "payload missing or too large")
-    m = re.match(r"^([A-Za-z0-9_-]+)\.([0-9a-f]{12})$", payload)
-    if not m:
-        abort(400, "malformed payload")
-    b64u, integrity = m.groups()
-    try:
-        raw = urlsafe_b64decode(b64u + "=" * (-len(b64u) % 4))
-    except Exception:
-        abort(400, "bad base64url")
-    digest = sha256(raw).hexdigest()
-    if digest[:12] != integrity:
-        abort(400, "integrity mismatch")
-    try:
-        inflated = zlib.decompressobj(-15).decompress(raw, MAX_SNAPSHOT_INFLATED + 1)
-    except Exception:
-        abort(400, "bad deflate stream")
-    if len(inflated) > MAX_SNAPSHOT_INFLATED:
-        abort(400, "snapshot too large")
-    try:
-        data = json.loads(inflated)
-    except Exception:
-        abort(400, "invalid JSON")
-    if not isinstance(data, dict) or data.get("v") != 1 or not isinstance(data.get("books"), list):
-        abort(400, "unsupported schema")
-    if len(data["books"]) > MAX_SNAPSHOT_BOOKS:
-        abort(400, "too many books")
-    name = data.get("name")
-    if name is not None and (not isinstance(name, str) or len(name) > 120):
-        abort(400, "bad name")
-    if name and (URL_IN_TEXT_RE.search(name) or BARE_DOMAIN_RE.search(name)):
-        abort(400, "links are not allowed in shelf names")
-    for b in data["books"]:
-        if not isinstance(b, dict) or set(b) - {"idType", "id", "rating", "comment", "status"}:
-            abort(400, "bad book entry")
-        if b.get("idType") not in ALLOWED_ID_TYPES or not isinstance(b.get("id"), str) or not ID_RE.match(b["id"]):
-            abort(400, "bad book id")
-        if b.get("status") not in ALLOWED_STATUSES:
-            abort(400, "bad status")
-        if "rating" in b and (not isinstance(b["rating"], int) or not 0 <= b["rating"] <= 5):
-            abort(400, "bad rating")
-        if "comment" in b and (not isinstance(b["comment"], str) or len(b["comment"]) > 2000):
-            abort(400, "bad comment")
-        if "comment" in b and URL_IN_TEXT_RE.search(b["comment"]):
-            abort(400, "links are not allowed in comments")
-    return digest, (name or None), len(data["books"])
-
-
-# ------------------------------------------------ snapshot minting abuse caps
-
-MINT_PER_IP_HOUR = int(os.environ.get("HASHSHELF_MINT_PER_IP_HOUR", "30"))
-MINT_GLOBAL_PER_DAY = int(os.environ.get("HASHSHELF_MINT_GLOBAL_PER_DAY", "2000"))
-
-_mint_lock = threading.Lock()
-_mint_by_ip = {}                      # ip -> deque of recent mint timestamps
-_mint_day = {"day": -1, "count": 0}   # global ceiling, resets at UTC midnight
-
-
-def _client_ip():
-    """Real client IP behind Cloudflare -> Render's proxy -> Flask."""
-    return (
-        request.headers.get("CF-Connecting-IP")
-        or (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
-        or request.remote_addr
-        or "?"
-    )
-
-
-def _mint_allowed(ip, now=None):
-    """Per-IP hourly + global daily caps on snapshot mints.
-
-    In-memory is correct here: the app runs as one gunicorn process, and losing
-    counters on restart only makes us briefly generous. The global ceiling is
-    the backstop against per-IP evasion (spoofed CF headers, botnets) and
-    doubles as a disk-fill guard for the snapshot store.
-    """
-    now = time.time() if now is None else now
-    day = int(now // 86400)
-    with _mint_lock:
-        if _mint_day["day"] != day:
-            _mint_day["day"], _mint_day["count"] = day, 0
-        if _mint_day["count"] >= MINT_GLOBAL_PER_DAY:
-            return False
-        hits = _mint_by_ip.get(ip)
-        if hits is None:
-            if len(_mint_by_ip) > 10000:  # bound memory, same policy as _inflight_locks
-                _mint_by_ip.clear()
-            hits = _mint_by_ip[ip] = deque()
-        while hits and hits[0] <= now - 3600:
-            hits.popleft()
-        if len(hits) >= MINT_PER_IP_HOUR:
-            return False
-        hits.append(now)
-        _mint_day["count"] += 1
-        return True
-
-
-@app.post("/api/snapshot")
-def api_snapshot():
-    if not _mint_allowed(_client_ip()):
-        abort(429, "short-link creation is rate-limited; the full-length link still works")
-    body = request.get_json(force=True, silent=True) or {}
-    payload = body.get("payload")
-    digest, name, count = _validate_snapshot_payload(payload)
-
-    conn = db()
-    slug = None
-    for length in (12, 16, 24, 64):
-        cand = digest[:length]
-        row = conn.execute("SELECT digest FROM snapshots WHERE slug=?", (cand,)).fetchone()
-        if row is None or row[0] == digest:
-            slug = cand
-            break
-    if slug is None:
-        abort(500, "slug space exhausted")
-    conn.execute(
-        "INSERT OR IGNORE INTO snapshots (slug, digest, payload, name, book_count, created_at) VALUES (?,?,?,?,?,?)",
-        (slug, digest, payload, name, count, int(time.time())),
-    )
-    conn.commit()
-    resp = jsonify({"slug": slug})
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
-
-
-@app.get("/api/snapshot/<slug>")
-def api_snapshot_get(slug):
-    """Resolve a short link back to its payload (used by Compare)."""
-    if not re.match(r"^[0-9a-f]{12,64}$", slug):
-        abort(404)
-    row = db().execute("SELECT payload FROM snapshots WHERE slug=?", (slug,)).fetchone()
-    if row is None:
-        abort(404)
-    resp = jsonify({"payload": row[0]})
-    resp.headers["Cache-Control"] = "public, max-age=3600"
-    return resp
-
-
 def _read_index():
     with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
         return f.read()
-
-
-@app.get("/s/<slug>")
-def snapshot_page(slug):
-    if not re.match(r"^[0-9a-f]{12,64}$", slug):
-        abort(404)
-    row = db().execute(
-        "SELECT payload, name, book_count FROM snapshots WHERE slug=?", (slug,)
-    ).fetchone()
-    if row is None:
-        abort(404)
-    payload, name, count = row
-    title = f"{name} — HashShelf" if name else "A HashShelf shelf"
-    plural = "book" if count == 1 else "books"
-    desc = f"{count} {plural} · shared with HashShelf, the link-based book tracker. No accounts."
-
-    page = _read_index()
-    page = re.sub(r"<title>.*?</title>", f"<title>{html.escape(title)}</title>", page, count=1, flags=re.S)
-    page = re.sub(
-        r'(<meta property="og:title" content=")[^"]*(")',
-        rf"\g<1>{html.escape(title)}\g<2>", page, count=1)
-    page = re.sub(
-        r'(<meta property="og:description" content=")[^"]*(")',
-        rf"\g<1>{html.escape(desc)}\g<2>", page, count=1)
-    page = re.sub(
-        r'(<meta name="description" content=")[^"]*(")',
-        rf"\g<1>{html.escape(desc)}\g<2>", page, count=1)
-    page = re.sub(
-        r'(<meta property="og:url" content=")[^"]*(")',
-        rf"\g<1>{html.escape(request.base_url)}\g<2>", page, count=1)
-    # Hand the snapshot to the app via a <meta> tag, NOT an inline <script>:
-    # the strict CSP (script-src 'self') blocks inline scripts, so an inline
-    # bootstrap silently fails and the short link renders nothing. The payload
-    # alphabet is [A-Za-z0-9_.-]; escape anyway as defense in depth.
-    bootstrap = f'<meta name="hashshelf-snapshot" content="#{html.escape(payload, quote=True)}" />'
-    page = page.replace("</head>", "    " + bootstrap + "\n  </head>", 1)
-    # no-cache (revalidate), not max-age: the per-slug data is immutable, but
-    # caching the HTML template for an hour would freeze template fixes (and did
-    # — a CSP fix stayed masked behind cached /s/ pages). 304s keep it cheap.
-    return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"}
 
 
 # Locks the browser to exactly what the app is: same-origin code, OpenLibrary
@@ -919,7 +709,7 @@ def security_headers(resp):
 @app.get("/healthz")
 def healthz():
     # db_on_disk: True when the database lives on the persistent disk, i.e.
-    # short links and the cache survive restarts. Diagnostic, not sensitive.
+    # the OpenLibrary cache survives restarts. Diagnostic, not sensitive.
     cached = db().execute("SELECT COUNT(*) FROM books").fetchone()[0]
     return {"ok": True, "version": APP_VERSION,
             "db_on_disk": DB_PATH.startswith("/var/data"), "books_cached": cached}

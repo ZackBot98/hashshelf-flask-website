@@ -4,6 +4,14 @@
 **Scope:** adversarial testing of the whole webapp (client codec, server API,
 security, concurrency, browser behavior) as the final gate before launch.
 
+> **Historical note (2026-08-11):** the **short-link** feature was removed entirely
+> in v1.8.0 — the server now stores no user content, and there is no `/api/snapshot`
+> mint, no `/s/<slug>` page, and no `snapshots` table. Findings below that concern
+> short links (F5, F6, the "borrowed-domain unfurl" phishing surface, the
+> mint rate-limiter, and Campaign 2's URL-in-stored-shelf tests) describe code that
+> no longer exists; they are kept for the record. The client codec, XSS/inert-text
+> rendering, path-traversal, header, and hydration findings are all still current.
+
 ## Verdict
 
 **Ship it.** One critical vulnerability was found *and fixed* during this pass

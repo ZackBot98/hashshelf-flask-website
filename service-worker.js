@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hashshelf-cache-v61';
+const CACHE_NAME = 'hashshelf-cache-v62';
 const API_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ASSETS = [
   '/',
@@ -63,9 +63,9 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
 
-    // Navigations are network-first: /s/<slug> pages are server-rendered with a
-    // per-shelf snapshot, and a cached app shell would mask both their content
-    // and any template fix. Fall back to the cached shell only when offline.
+    // Navigations are network-first so a template fix or a doc-page edit is
+    // never masked by a stale cached shell. Fall back to the cached shell only
+    // when offline.
     if (req.mode === 'navigate') {
       try {
         return await fetch(req);
@@ -110,7 +110,7 @@ self.addEventListener('fetch', (event) => {
     if (cached) return cached;
     try {
       const res = await fetch(req, { cache: 'no-cache' });
-      if (url.origin === self.location.origin && cacheable(res) && !url.pathname.startsWith('/s/')) {
+      if (url.origin === self.location.origin && cacheable(res)) {
         cache.put(req, res.clone());
       }
       return res;

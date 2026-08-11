@@ -51,9 +51,9 @@
 
       <div class="callout"><strong>Plain-language summary (not a substitute for the terms below).</strong>
       Use HashShelf for book lists. Don't use it to store or spread anything illegal, deceptive,
-      or harmful — including malicious links. You're responsible for what you put in your shelves.
-      The service is provided "as is," and our liability is limited. We can remove content and
-      block access when these terms are broken.</div>
+      or harmful — including malicious links. You're responsible for what you make and share.
+      HashShelf stores none of it — your shelf lives in its link, not on our server — and the
+      Service is provided "as is," with our liability limited.</div>
 
       <h2><span class="no">1</span> Agreement to these terms</h2>
       <p>By accessing or using HashShelf (the "Service") — the website at
@@ -66,17 +66,13 @@
       no login, and no profile. Your shelf lives in the link itself: the characters after the
       <code>#</code> in a HashShelf URL are your books, compressed and checksummed — not a lookup
       code for a record about you.</p>
-      <p>Two kinds of links exist, and the distinction matters:</p>
-      <ul>
-        <li><strong>Full ("long") links</strong> carry the entire shelf in the URL fragment.
-        Because browsers never transmit the fragment to a server, the content of a long link is
-        <strong>never received, seen, or stored by us</strong>. It exists only on the devices of
-        people who hold the link.</li>
-        <li><strong>Short links</strong> (<code>hashshelf.com/s/…</code>) are created only when you
-        choose to shorten a shelf. When you do, a copy of that shelf ("snapshot") is stored on our
-        server and re-served at that address with a preview. Short links are the only user content
-        we store.</li>
-      </ul>
+      <p>Your shelf is shared as a self-contained link. The entire shelf is encoded into the URL
+      fragment — the part after the <code>#</code> — and because browsers never transmit the
+      fragment to a server, <strong>the content of a HashShelf link is never received, seen, or
+      stored by us</strong>. It exists only on the devices of the people who hold the link.
+      HashShelf stores <strong>no shelves and no other user content</strong>: there are no
+      accounts, and the only data our server keeps is a disposable cache of public book facts
+      from third-party sources.</p>
       <p>Book titles, authors, covers, and subjects are supplied by third-party sources (see
       Section 10). The Service is provided free of charge and is supported by affiliate links
       (Section 9).</p>
@@ -88,8 +84,8 @@
 
       <h2><span class="no">4</span> Acceptable use</h2>
       <p>HashShelf is for creating and sharing book lists. You agree <strong>not</strong> to use
-      the Service — including any shelf name, comment, or shortened snapshot — to create, store,
-      transmit, link to, or make available any of the following:</p>
+      the Service — including any shelf name or comment — to create, encode, transmit, link to,
+      or make available any of the following:</p>
       <ul>
         <li>Content that is unlawful, or that promotes, facilitates, or coordinates unlawful activity;</li>
         <li><strong>Malicious, deceptive, or harmful links or references</strong> — including
@@ -101,11 +97,11 @@
         <li>Content that infringes anyone's copyright, trademark, privacy, publicity, or other rights;</li>
         <li>Private or personal information about another person shared without permission ("doxxing");</li>
         <li>Impersonation of any person or organization, or misrepresentation of your affiliation with one;</li>
-        <li>Spam, or bulk or automated creation of shelves or short links.</li>
+        <li>Spam, or bulk or automated creation of shelves or links.</li>
       </ul>
       <p>You also agree not to:</p>
       <ul>
-        <li>Use the Service as a covert channel to store or exchange messages or data for purposes
+        <li>Use the Service as a covert channel to encode or exchange messages or data for purposes
         unrelated to book lists, in furtherance of any of the above;</li>
         <li>Probe, scan, or test the vulnerability of the Service, or breach or circumvent its
         security, rate limits, or access controls;</li>
@@ -125,35 +121,33 @@
       create. As between you and us, <strong>you retain all rights to your content, and you are
       solely responsible for it</strong> and for the consequences of sharing it. You represent
       that you have the rights necessary to your content and that it does not violate Section 4.</p>
-      <p>When — and only when — you choose to create a short link, you grant us a limited,
-      non-exclusive, royalty-free, worldwide license to store, host, reproduce, and display that
-      snapshot for the purpose of operating the Service (that is, so we can serve it back at its
-      short-link address). This license ends when the snapshot is removed. We claim no ownership of
-      your content. We do not sell it, and we do not use it to build a profile of you.</p>
+      <p>Because HashShelf does not store your content — it lives in your link, not on our server —
+      you grant us no license to it, and there is nothing of yours for us to retain, sell, or
+      profile from. We never claim ownership of your content.</p>
 
-      <h2><span class="no">6</span> Short links and storage</h2>
-      <p>Short links are content-addressed: the address is derived from the shelf's contents, so
-      identical shelves produce the same short link. Creating short links is rate-limited, and we
-      may decline to create, may remove, or may disable any short link at our discretion, including
-      to enforce Section 4. Removing the underlying record causes that short link to stop resolving.
-      Full (long) links are unaffected by any of this, because they don't depend on our storage.</p>
+      <h2><span class="no">6</span> No storage of your shelves</h2>
+      <p>HashShelf does not store your shelves or any other content you create. Earlier versions
+      offered an optional "short link" that saved a copy of a shelf on our server; <strong>that
+      feature has been removed, and any previously stored copies have been deleted</strong>. Shelves
+      are shared only as self-contained links whose data never reaches our server. The only thing
+      our server stores is a disposable cache of public book facts from third-party sources
+      (Section 10), which contains no information about you.</p>
 
-      <h2><span class="no">7</span> Reporting abuse &amp; copyright (takedown)</h2>
-      <p>If you believe a short link hosted by HashShelf violates these Terms or your rights, tell
-      us and we'll review it. Email <a class="link" href="mailto:report@hashshelf.com">report@hashshelf.com</a>
-      with the short link (the full <code>hashshelf.com/s/…</code> URL) and a short description of
-      the problem. We aim to review reports promptly and will remove content that violates these
-      Terms.</p>
+      <h2><span class="no">7</span> Reporting &amp; copyright (DMCA)</h2>
+      <p>Because HashShelf stores no user content, there is generally nothing hosted on our servers
+      for us to remove — a shelf lives only in a link its holder controls, not with us. Even so, you
+      can reach us with any concern, abuse report, or legal notice at
+      <a class="link" href="mailto:report@hashshelf.com">report@hashshelf.com</a>, and we will respond.</p>
       <h3>Copyright (DMCA)</h3>
-      <p>We respond to notices of alleged copyright infringement under the U.S. Digital Millennium
-      Copyright Act. If you are a rights holder (or authorized to act for one) and believe content
-      on the Service infringes your copyright, send a notice to
+      <p>We respect intellectual-property rights and respond to notices under the U.S. Digital
+      Millennium Copyright Act regarding material we actually host (for example, the Service's own
+      pages and assets). If you believe such material infringes your copyright, send a notice to
       <a class="link" href="mailto:report@hashshelf.com">report@hashshelf.com</a> that includes: (a) your
-      physical or electronic signature; (b) identification of the copyrighted work; (c) the short-link
-      URL of the material you want removed; (d) your contact information; (e) a statement that you
-      have a good-faith belief the use is not authorized; and (f) a statement, under penalty of
-      perjury, that your notice is accurate and that you are the owner or authorized to act on the
-      owner's behalf. We may remove infringing material and terminate access for repeat infringers.</p>
+      physical or electronic signature; (b) identification of the copyrighted work; (c) the URL or
+      location of the material; (d) your contact information; (e) a statement that you have a
+      good-faith belief the use is not authorized; and (f) a statement, under penalty of perjury,
+      that your notice is accurate and that you are the owner or authorized to act on the owner's
+      behalf. Shelves shared as links are not hosted by us and are outside our control.</p>
 
       <h2><span class="no">8</span> Intellectual property &amp; the code</h2>
       <p>The name "HashShelf," the logo, and the look and feel of the Service are the property of
@@ -183,10 +177,10 @@
       <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTIES OF ANY KIND, WHETHER
       EXPRESS, IMPLIED, OR STATUTORY, INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR
       A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. We do not warrant that the Service will be
-      uninterrupted, secure, or error-free, that book data will be accurate, or that links or stored
-      snapshots will be preserved. You are responsible for keeping your own copy of any link that
-      matters to you. Some jurisdictions don't allow certain warranty exclusions, so parts of this
-      section may not apply to you.</p>
+      uninterrupted, secure, or error-free, or that book data will be accurate. Because your shelf
+      lives only in its link and nowhere on our servers, <strong>you are responsible for keeping
+      your own copy of any link that matters to you</strong>. Some jurisdictions don't allow certain
+      warranty exclusions, so parts of this section may not apply to you.</p>
 
       <h2><span class="no">12</span> Limitation of liability</h2>
       <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE OPERATOR WILL NOT BE LIABLE FOR ANY INDIRECT,

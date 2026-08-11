@@ -3,13 +3,13 @@
 (function(root) {
   // ------------------------------------------------------- link-free policy
 
-  // Shared shelves are link-free text, so a hashshelf.com page can never carry
-  // someone else's URL. Comments reject pasteable link forms; shelf names are
-  // stricter (they become the unfurl title on short links) and also reject
-  // bare domains. Mirrors URL_IN_TEXT_RE / BARE_DOMAIN_RE in server.py — keep
-  // in sync so anything addable stays shortenable.
+  // Shelves are kept link-free — the add-book form and shelf-name field reject
+  // pasteable URLs (names also reject bare domains, since the name is the
+  // shelf's title). This is a client-side courtesy, not a security boundary:
+  // no shelf is stored on a server, and shared shelf text is only ever rendered
+  // as inert, non-clickable text. Goodreads imports strip URLs instead (below).
   const URL_IN_TEXT_RE = /(?:https?:\/\/|ftp:\/\/|www\.)/i;
-  // Keep this TLD set in sync with _BARE_TLDS in server.py.
+  // TLDs rejected as bare domains in shelf names.
   const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su)\b/i;
 
   function commentHasUrl(text) {

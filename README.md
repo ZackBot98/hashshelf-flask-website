@@ -20,14 +20,14 @@ Live at **[hashshelf.com](https://hashshelf.com)** · [About / manifesto](https:
 - **Compare shelves**: paste someone's link to see overlap, books only they have, and where your ratings disagree most — then add their books to your want list in one click.
 - **Year in review**: a shareable PNG card (covers, counts, top authors/genres, rating distribution), rendered entirely client-side.
 - Filter by status **and genre**; genres are derived from OpenLibrary subjects, not stored in the link.
-- Live snapshot: the URL hash updates as you edit. "Create HashShelf" copies a shareable link (a short `/s/<slug>` link with a proper social preview when the backend is up, the full hash link otherwise).
-- Open any snapshot link to reconstruct the list deterministically. "Copy to my shelf" imports someone else's shelf into your own.
+- Live link: the URL hash updates as you edit. "Create HashShelf" copies a shareable link — the full, self-contained hash link, which carries the whole shelf and never touches the server.
+- Open any HashShelf link to reconstruct the list deterministically. "Copy to my shelf" imports someone else's shelf into your own.
 - Each shelf's name is the title shown on links you share (it travels in the hash; the schema's `name` field carries it).
 - Installable PWA; works offline after first load.
 
 ## Design invariant
 
-**The URL hash is the source of truth.** The full hash link is always a complete, self-contained copy of the shelf. Everything server-side is either a cache of OpenLibrary (disposable) or a copy of a snapshot that also lives in its long link. Losing the backend never loses data, and the app still works served as plain static files.
+**The URL hash is the source of truth — and the only place a shelf lives.** The hash link is always a complete, self-contained copy of the shelf, and because it's a URL fragment it is never sent to the server. The server stores **no user content**: the database is purely a disposable OpenLibrary cache. Losing the backend never loses data, and the app still works served as plain static files.
 
 ## Snapshot format
 
@@ -52,8 +52,7 @@ Encoding:
 
 - Payload = raw deflate (fflate, vendored) of the canonical JSON, base64-url encoded.
 - Integrity suffix = first 12 hex chars of SHA-256 over the **deflated bytes** (48-bit). This detects corruption/truncation of shared links; it is a checksum, not authentication.
-- Final link: `https://hashshelf.com/#<payload>.<hash>`
-- Short link: `https://hashshelf.com/s/<slug>` where `slug` is a prefix of the SHA-256 digest — snapshots are content-addressed, so the same shelf always yields the same short link.
+- Final link: `https://hashshelf.com/#<payload>.<hash>` — self-contained; the fragment carries the whole shelf and is never sent to the server.
 
 ## Architecture
 
@@ -71,7 +70,7 @@ ui.js              Rendering, events, shelves, filters, clipboard, live hash
 genres.json        Genre rules, shared by server.py and lib.js
 service-worker.js  Asset + API cache (7d TTL), offline support
 vendor/fflate.min.js  Vendored fflate 0.8.2 (hash-verified against npm)
-server.py          Flask: static serving + API + short links + OG tags +
+server.py          Flask: static serving + OpenLibrary API cache +
                    security headers + background cache prewarmer
 render.yaml        Render blueprint (Starter + persistent disk)
 _headers           Same security headers for static hosting (CF Pages fallback)
@@ -98,10 +97,9 @@ OpenLibrary subjects are messy free text ("Fiction, science fiction, general", "
 
 - `POST /api/books` — bulk hydration: `{books: [{idType, id}]}` → assembled `{title, authors, coverUrl, genres, workId}` per book. SQLite-cached (60d TTL), so OpenLibrary is hit at most once per book per TTL across *all* users. The client batches same-tick requests, so rendering a whole shelf is one round trip.
 - `GET /api/search?q=` — cached OpenLibrary search (24h TTL) with English-edition title/cover enrichment done server-side.
-- `POST /api/snapshot` — validates a snapshot payload (integrity, deflate, schema, link-free text) and stores it content-addressed; returns the short-link slug. Minting is rate-limited per IP (default 30/hour) with a global daily ceiling (default 2000) — both env-tunable (`HASHSHELF_MINT_PER_IP_HOUR`, `HASHSHELF_MINT_GLOBAL_PER_DAY`).
-- `GET /api/snapshot/<slug>` — resolves a short link back to its payload (used by Compare).
-- `GET /s/<slug>` — serves the app with per-shelf OpenGraph tags (link unfurls!) and the snapshot inlined.
 - `GET /healthz` — `{ok, version, db_on_disk, books_cached}`; `db_on_disk` confirms the SQLite file lives on the persistent disk, `books_cached` makes cache growth observable.
+
+The API is only an OpenLibrary cache — there is **no endpoint that stores shelves**. Shelves live entirely in their links.
 
 A **background prewarmer** (on real servers only — activated by Render's `RENDER` env var, or a direct `python server.py` run) slowly stocks the cache with popular books: OpenLibrary's trending lists, then paginated subject walks, ≤ ~30 books/hour through the same rate-limited pipeline. Already-cached books are skipped before any upstream call, and the ladder cursor persists in the DB so restarts resume the walk instead of rereading page one. Tests and CI never start it.
 
@@ -126,12 +124,12 @@ Static-only development still works too (`python -m http.server 5173` from the r
 
 The repo contains a `render.yaml` blueprint: Render → New → Blueprint → connect the repo. It runs `gunicorn` serving `server:app`.
 
-- The blueprint provisions the paid setup: **Starter instance + 1 GB persistent disk** at `/var/data` with `HASHSHELF_DB` pointing at it — always-on, and short links + cache survive deploys (verify via `db_on_disk` in `/healthz`). On the free plan the app still works (the client's fallback covers cold starts), but the filesystem is ephemeral, so short links die on every restart.
+- The blueprint provisions the paid setup: **Starter instance + 1 GB persistent disk** at `/var/data` with `HASHSHELF_DB` pointing at it — always-on, and the OpenLibrary cache survives deploys (verify via `db_on_disk` in `/healthz`). On the free plan the app still works (the client's fallback covers cold starts), but the filesystem is ephemeral, so the cache resets on every restart. No user data is ever at stake — the server stores none; the disk holds only the disposable book cache.
 - Point `hashshelf.com` at the Render service (add the custom domain in Render, update the DNS record in Cloudflare, keep the proxy on for CDN caching). Bump `CACHE_NAME` in `service-worker.js` on deploys that change assets.
 
 ### Static hosting (Cloudflare Pages, GitHub Pages, Netlify…)
 
-Still fully supported — publish the repo root as-is. Everything works except short links and per-shelf link previews (the client hydrates straight from OpenLibrary).
+Fully supported, at parity — publish the repo root as-is. There are no server-side shelf features to lose: shelves live entirely in their links, and the client hydrates straight from OpenLibrary. (You only forgo the server-side cache that trims repeat OpenLibrary calls.)
 
 ## Affiliate links
 
@@ -155,12 +153,12 @@ id configured — if you run a copy locally, clear or replace it.
 
 ## Security & privacy
 
+- **The server stores no user content.** Shelves live only in their links; the database is a disposable OpenLibrary cache with no accounts, no cookies, and nothing tying data to a person. (The hosting layer's standard access logs exist, as with any web host.)
 - Strict security headers on every response: CSP (`script-src 'self'` — no inline code exists anywhere, enforced by tests; only OpenLibrary/Internet Archive hosts allowed for data and covers), HSTS, `nosniff`, frame denial, and a tight referrer policy. Third-party scripts are browser-refused, not merely absent.
-- Snapshots are deterministic and integrity-checked (corruption detection, not authentication — anyone can mint a valid link).
-- Shelf data leaves the browser only via links you share, or when you explicitly mint a short link (which stores that snapshot server-side).
-- The server stores no user identity: no accounts, no cookies, and nothing in the database ties data to a person. Short links are content-addressed blobs. (The hosting layer's standard access logs exist, as with any web host.)
-- All rendering uses `textContent` — comments from shared links cannot inject HTML.
-- **Stored shelves are link-free by policy.** Short-link creation rejects URLs in comments and URLs *or bare domains* in shelf names (the name becomes the unfurl title, a classic borrowed-domain phishing surface), and user text is never auto-linkified — so a `hashshelf.com` page can never deliver someone else's link. Goodreads import strips URLs from reviews rather than failing. Minting is rate-limited (per-IP + global) against spam campaigns and disk-fill.
+- Snapshots (the shelf encoding carried in a link) are deterministic and integrity-checked — corruption detection, not authentication.
+- Shelf data leaves the browser only inside a link you choose to share, and that link — a URL fragment — is never transmitted to any server.
+- All rendering uses `textContent` — names and comments from a shared link cannot inject HTML and are never turned into clickable links.
+- The client keeps shelves link-free as a courtesy (the add-book form and shelf-name field reject pasteable URLs; Goodreads import strips them), but the real guarantee is that shared shelf text is only ever rendered as inert text.
 
 ## Contributing
 

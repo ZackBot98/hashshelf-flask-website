@@ -61,9 +61,9 @@
   const APP_TITLE = 'HashShelf — Link-based book tracker';
   const LONG_LINK_WARN = 8000;
 
-  // When loaded via a short link the pathname is /s/<slug>; live-hash URLs for
-  // the user's own draft must be written against the app root instead.
-  const APP_PATH = location.pathname.replace(/s\/[0-9a-f]{12,64}\/?$/i, '') || '/';
+  // Shelves are shared as self-contained links whose data rides in the URL
+  // fragment (#…). The app always lives at the site root.
+  const APP_PATH = '/';
 
   let store = loadShelves();
   let books = activeShelf().books;
@@ -161,12 +161,6 @@
   }
   function isOwnHash(hash) {
     return !!hash && ownHashes().includes(hash);
-  }
-
-  function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(t));
   }
 
   async function updateLiveHash() {
@@ -620,9 +614,9 @@
     clearSuggestions();
   }
 
-  // Must match the server's snapshot validator (ID_RE, comment cap) so a book
-  // that's addable is also always shortenable — otherwise the shelf works as a
-  // long link but silently can't become a short link, and won't hydrate either.
+  // Book ids must be a shape OpenLibrary can hydrate; comments are capped so a
+  // shared link stays a sane length. (Matches the id/comment shapes the app
+  // has always used.)
   const ID_RE = /^[A-Za-z0-9 ._:-]{1,64}$/;
   const MAX_COMMENT = 2000;
 
@@ -668,47 +662,27 @@
 
   async function createSnapshot() {
     try {
+      // The shelf is encoded entirely into the link's URL fragment. That link
+      // is the complete, self-contained copy of the shelf — it never touches
+      // our server, so there is nothing to store and nothing to mint.
       const hash = await HashShelfSnapshot.encodeSnapshot(books, activeShelf().name);
-      const longLink = `${location.origin}${APP_PATH}${hash}`;
-      history.replaceState(null, '', longLink);
+      const link = `${location.origin}${APP_PATH}${hash}`;
+      history.replaceState(null, '', link);
       rememberOwnHash(hash);
-
-      // Try to mint a short link (nicer to share, unfurls with a preview).
-      // The long link is always a full copy of the data and works without it.
-      let link = longLink;
-      let labelled = 'link';
-      let mintStatus = 0;
-      try {
-        const res = await fetchWithTimeout('/api/snapshot', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ payload: hash.slice(1) })
-        }, 6000);
-        mintStatus = res.status;
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.slug) {
-            link = `${location.origin}/s/${data.slug}`;
-            labelled = 'short link';
-          }
-        }
-      } catch {}
 
       const copied = await copyTextRobust(link);
       snapshotLinkInput.value = link;
       snapshotOutput.classList.remove('is-hidden');
-      if (labelled === 'link' && mintStatus === 429) {
-        showNotice(`Short links are rate-limited right now, so you got the full link instead — it works exactly the same.${copied ? ' Copied.' : ''}`, 'ok', 6000);
-      } else if (labelled === 'link' && longLink.length > LONG_LINK_WARN) {
-        showNotice(`Link copied, but it is ${longLink.length} characters — some apps truncate links this long. Short links need the HashShelf backend, which is currently unreachable.`, 'error');
+      if (link.length > LONG_LINK_WARN) {
+        showNotice(`Link copied, but it is ${link.length} characters — a few apps truncate links this long. Trimming the shelf, or splitting it in two, keeps links shorter.`, 'error');
       } else if (copied) {
-        showNotice(`Copied ${labelled} to clipboard.`, 'ok', 2500);
+        showNotice('Copied link to clipboard.', 'ok', 2500);
       } else {
         showNotice('Copy failed. Link shown below.', 'error');
       }
     } catch (err) {
       console.error(err);
-      showNotice('Failed to create snapshot.', 'error');
+      showNotice('Failed to create link.', 'error');
     }
   }
 
@@ -846,21 +820,17 @@
 
   // -------------------------------------------------------------- compare
 
-  // Accepts a full URL or bare hash/slug and returns the snapshot hash string.
+  // Accepts a full HashShelf link (or a bare shelf hash) and returns the hash
+  // string. The shelf lives entirely in the link's #fragment — nothing to fetch.
   async function resolveLinkToHash(input) {
     const raw = String(input || '').trim();
     if (!raw) throw new Error('Paste a HashShelf link first.');
     const hashIdx = raw.indexOf('#');
     if (hashIdx >= 0 && raw.length > hashIdx + 1) return raw.slice(hashIdx);
-    const slugMatch = raw.match(/\/s\/([0-9a-f]{12,64})/i) || raw.match(/^([0-9a-f]{12,64})$/i);
-    if (slugMatch) {
-      const res = await fetchWithTimeout(`/api/snapshot/${slugMatch[1]}`, {}, 8000);
-      if (!res.ok) throw new Error('That short link could not be found on this server.');
-      const data = await res.json();
-      if (!data?.payload) throw new Error('That short link returned nothing.');
-      return `#${data.payload}`;
+    if (/\/s\/[0-9a-f]{12,64}/i.test(raw)) {
+      throw new Error('Short links have been retired. Ask for the full HashShelf link — the long one, with a # in it.');
     }
-    throw new Error('That does not look like a HashShelf link.');
+    throw new Error('That does not look like a HashShelf link. Paste the full link, including the part after the #.');
   }
 
   async function toEntries(bookList) {
@@ -1157,15 +1127,11 @@
     renderEditorList();
     initEvents();
 
-    // Short-link (/s/<slug>) pages carry the snapshot in a <meta> tag the
-    // server injects — a meta, not an inline script, so the strict CSP allows it.
-    const bootMeta = document.querySelector('meta[name="hashshelf-snapshot"]');
-    const boot = bootMeta ? (bootMeta.getAttribute('content') || '') : '';
+    // A shared shelf arrives entirely in the URL fragment (#…). If it's someone
+    // else's, show it; if it's our own live-hash URL, or a fresh visit, edit.
     const hash = location.hash || '';
     if (hash && !isOwnHash(hash)) {
-      loadSnapshotHash(hash);           // someone else's snapshot link
-    } else if (boot && !hash) {
-      loadSnapshotHash(boot);           // short-link page, snapshot inlined by the server
+      loadSnapshotHash(hash);           // someone else's shared link
     } else {
       switchToEditor();                 // fresh visit, or our own live-hash URL
       updateLiveHash();

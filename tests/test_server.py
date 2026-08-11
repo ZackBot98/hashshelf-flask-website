@@ -3,40 +3,15 @@
 Run from the repo root:  python -m unittest discover tests -v
 """
 
-import json
 import os
 import sys
 import tempfile
 import unittest
-import zlib
-from base64 import urlsafe_b64encode
-from hashlib import sha256
 from unittest import mock
 
 os.environ["HASHSHELF_DB"] = os.path.join(tempfile.mkdtemp(), "test.db")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import server  # noqa: E402
-
-# The suite mints many snapshots from one test-client IP; keep the abuse caps
-# out of the way except in MintRateLimitTests, which sets its own values.
-server.MINT_PER_IP_HOUR = 10000
-server.MINT_GLOBAL_PER_DAY = 100000
-
-
-def make_payload(obj):
-    """Build a valid snapshot payload the way the client does (raw deflate)."""
-    raw = json.dumps(obj, separators=(",", ":")).encode()
-    comp = zlib.compressobj(9, zlib.DEFLATED, -15)
-    deflated = comp.compress(raw) + comp.flush()
-    b64 = urlsafe_b64encode(deflated).rstrip(b"=").decode()
-    return f"{b64}.{sha256(deflated).hexdigest()[:12]}"
-
-
-VALID_SNAPSHOT = {
-    "v": 1,
-    "name": "Zack",
-    "books": [{"idType": "work", "id": "OL45804W", "rating": 5, "status": "finished"}],
-}
 
 
 class GenreTests(unittest.TestCase):
@@ -88,47 +63,6 @@ class HelperTests(unittest.TestCase):
         for _ in range(3):
             b.acquire()
         self.assertLess(b.tokens, 1)
-
-
-class SnapshotValidationTests(unittest.TestCase):
-    def _reject(self, payload, msg):
-        from werkzeug.exceptions import HTTPException
-        with self.assertRaises(HTTPException, msg=msg) as ctx:
-            server._validate_snapshot_payload(payload)
-        self.assertEqual(ctx.exception.code, 400, msg)
-
-    def test_valid_roundtrip(self):
-        digest, name, count = server._validate_snapshot_payload(make_payload(VALID_SNAPSHOT))
-        self.assertEqual(name, "Zack")
-        self.assertEqual(count, 1)
-        self.assertEqual(len(digest), 64)
-
-    def test_tampered_integrity(self):
-        p = make_payload(VALID_SNAPSHOT)
-        flipped = ("B" if p[0] != "B" else "C") + p[1:]
-        self._reject(flipped, "tampered payload must 400")
-
-    def test_garbage_and_schema_violations(self):
-        self._reject("notavalidpayload", "malformed")
-        self._reject("!!!.aaaaaaaaaaaa", "bad alphabet")
-        bad_variants = [
-            {"v": 2, "books": []},                                            # wrong version
-            {"v": 1, "books": "nope"},                                        # books not a list
-            {"v": 1, "books": [{"idType": "cd", "id": "X", "status": "want"}]},   # bad idType
-            {"v": 1, "books": [{"idType": "work", "id": "OL1W", "status": "meh"}]},  # bad status
-            {"v": 1, "books": [{"idType": "work", "id": "OL1W", "status": "want", "extra": 1}]},
-            {"v": 1, "books": [{"idType": "work", "id": "OL1W", "status": "want", "rating": 9}]},
-            {"v": 1, "name": "x" * 121, "books": []},                          # name too long
-        ]
-        for snap in bad_variants:
-            self._reject(make_payload(snap), f"schema violation should 400: {snap}")
-
-    def test_book_count_cap(self):
-        big = {"v": 1, "books": [
-            {"idType": "work", "id": f"OL{i}W", "status": "want"}
-            for i in range(server.MAX_SNAPSHOT_BOOKS + 1)
-        ]}
-        self._reject(make_payload(big), "too many books")
 
 
 def fake_ol(routes):
@@ -362,118 +296,36 @@ class SecurityHeaderTests(unittest.TestCase):
             self.assertNotIn(' style="', body, path)
 
 
-class SnapshotEndpointTests(unittest.TestCase):
+class ShortLinksRemovedTests(unittest.TestCase):
+    """Short links were removed entirely: no minting, no storage, no /s/ page.
+    The server must store no user content and expose no snapshot surface."""
+
     @classmethod
     def setUpClass(cls):
         cls.client = server.app.test_client()
 
-    def test_mint_is_idempotent_and_resolvable(self):
-        payload = make_payload(VALID_SNAPSHOT)
-        r1 = self.client.post("/api/snapshot", json={"payload": payload})
-        r2 = self.client.post("/api/snapshot", json={"payload": payload})
-        self.assertEqual(r1.status_code, 200)
-        slug = r1.get_json()["slug"]
-        self.assertEqual(slug, r2.get_json()["slug"])          # content-addressed
-        self.assertEqual(slug, sha256_of(payload)[:12])
-        got = self.client.get(f"/api/snapshot/{slug}")
-        self.assertEqual(got.get_json()["payload"], payload)
-
-    def test_urls_blocked_in_stored_shelves(self):
-        # Abuse control (v1.6.0): a hashshelf.com page must never carry someone
-        # else's URL. Names are stricter than comments because they become the
-        # unfurl title on /s/ links (borrowed-domain phishing surface).
-        def mint(snap):
-            return self.client.post("/api/snapshot", json={"payload": make_payload(snap)})
-
-        blocked_names = [
-            "Deals at https://evil.example", "see WWW.evil.example", "visit evil.com now",
-            "invoice.zip", "watch demo.mov", "promo evil.xyz", "login evil.icu",
-        ]
-        for bad in blocked_names:
-            self.assertEqual(mint(dict(VALID_SNAPSHOT, name=bad)).status_code, 400, bad)
-
-        # No false positives on legitimate initials-with-dots names.
-        for ok in ["Vol. 2 favorites (J.R.R. picks)", "Books by C.S. Lewis & J.K.", "Sci-Fi 2026"]:
-            self.assertEqual(mint(dict(VALID_SNAPSHOT, name=ok)).status_code, 200, ok)
-
-        def with_comment(c):
-            return {"v": 1, "name": "Zack", "books": [
-                {"idType": "work", "id": "OL45804W", "status": "want", "comment": c}]}
-
-        for bad in ["grab it https://evil.example/x", "at WWW.evil.example", "ftp://drop.example"]:
-            self.assertEqual(mint(with_comment(bad)).status_code, 400, bad)
-
-        # Bare domains stay allowed in comments (real notes say "found on
-        # archive.org"); ordinary punctuation never false-positives.
-        self.assertEqual(mint(with_comment("found this on archive.org")).status_code, 200)
-        self.assertEqual(mint(dict(VALID_SNAPSHOT, name="Vol. 2 favorites (J.R.R. picks)")).status_code, 200)
-
-    def test_mint_rate_limits(self):
-        # Per-IP hourly cap, distinct IPs independent, global daily ceiling.
-        def mint(i, ip=None):
-            headers = {"CF-Connecting-IP": ip} if ip else {}
-            snap = dict(VALID_SNAPSHOT, name=f"rl shelf {i}")
-            return self.client.post(
-                "/api/snapshot", json={"payload": make_payload(snap)}, headers=headers)
-
-        old_ip, old_day = server.MINT_PER_IP_HOUR, server.MINT_GLOBAL_PER_DAY
-        try:
-            server._mint_by_ip.clear()
-            server._mint_day.update(day=-1, count=0)
-            server.MINT_PER_IP_HOUR = 3
-            for i in range(3):
-                self.assertEqual(mint(i).status_code, 200)
-            self.assertEqual(mint(99).status_code, 429)          # 4th from same IP
-            self.assertEqual(mint(100, ip="203.0.113.7").status_code, 200)  # other IP fine
-
-            server.MINT_PER_IP_HOUR = 10000
-            server.MINT_GLOBAL_PER_DAY = server._mint_day["count"] + 1
-            self.assertEqual(mint(101, ip="203.0.113.8").status_code, 200)
-            self.assertEqual(mint(102, ip="203.0.113.9").status_code, 429)  # global ceiling
-        finally:
-            server.MINT_PER_IP_HOUR, server.MINT_GLOBAL_PER_DAY = old_ip, old_day
-            server._mint_by_ip.clear()
-            server._mint_day.update(day=-1, count=0)
-
-    def test_s_page_snapshot_is_csp_safe(self):
-        # QA-found (v1.5.8): the snapshot bootstrap must be a <meta> tag, not an
-        # inline <script> — the strict CSP (script-src 'self') blocks inline
-        # scripts, which silently broke every short link. Guard both invariants.
-        payload = make_payload(VALID_SNAPSHOT)
-        slug = self.client.post("/api/snapshot", json={"payload": payload}).get_json()["slug"]
-        page = self.client.get(f"/s/{slug}").get_data(as_text=True)
-        self.assertIn('name="hashshelf-snapshot"', page)
-        self.assertIn(f'content="#{payload}"', page)
-        # zero inline scripts anywhere on the page (every <script> must have src=)
-        import re as _re
-        for tag in _re.findall(r"<script\b[^>]*>", page):
-            self.assertIn("src=", tag, f"inline script would be CSP-blocked: {tag}")
-        self.assertNotIn("__HASHSHELF_SNAPSHOT__", page)
-
-    def test_og_injection_and_name_escaping(self):
-        snap = {"v": 1, "name": 'Zack <script>alert(1)</script>', "books": []}
-        payload = make_payload(snap)
-        slug = self.client.post("/api/snapshot", json={"payload": payload}).get_json()["slug"]
-        page = self.client.get(f"/s/{slug}").get_data(as_text=True)
-        self.assertIn('name="hashshelf-snapshot"', page)       # meta bootstrap
-        self.assertIn("&lt;script&gt;", page)                  # escaped
-        self.assertNotIn("Zack <script>", page)                # never raw
-        self.assertIn("og:title", page)
-
-    def test_unknown_and_malformed_slugs(self):
-        self.assertEqual(self.client.get("/s/deadbeefdead").status_code, 404)
-        self.assertEqual(self.client.get("/s/NOTHEX!").status_code, 404)
+    def test_snapshot_endpoints_gone(self):
+        # POST to the old mint path no longer routes (405 from the GET-only
+        # static catch-all, or 404) — never a 200 with a slug.
+        self.assertIn(self.client.post("/api/snapshot", json={"payload": "x"}).status_code, (404, 405))
         self.assertEqual(self.client.get("/api/snapshot/deadbeefdead").status_code, 404)
 
-    def test_mint_rejects_invalid(self):
-        for body in [{}, {"payload": "junk"}, {"payload": "a" * 40000}]:
-            self.assertEqual(self.client.post("/api/snapshot", json=body).status_code, 400)
+    def test_s_page_gone(self):
+        for slug in ("deadbeefdead", "abcdef012345", "NOTHEX!"):
+            self.assertEqual(self.client.get(f"/s/{slug}").status_code, 404, slug)
 
+    def test_snapshots_table_purged(self):
+        # init_db drops it; no shelf is ever retained.
+        row = server.db().execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='snapshots'"
+        ).fetchone()
+        self.assertIsNone(row)
 
-def sha256_of(payload):
-    b64 = payload.split(".")[0]
-    from base64 import urlsafe_b64decode
-    return sha256(urlsafe_b64decode(b64 + "=" * (-len(b64) % 4))).hexdigest()
+    def test_no_snapshot_helpers_left(self):
+        # The mint/validate/rate-limit machinery is gone from the module.
+        for attr in ("api_snapshot", "snapshot_page", "_validate_snapshot_payload",
+                     "_mint_allowed", "MINT_PER_IP_HOUR"):
+            self.assertFalse(hasattr(server, attr), attr)
 
 
 if __name__ == "__main__":
