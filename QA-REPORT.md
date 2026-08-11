@@ -101,6 +101,67 @@ The Flask app sends `Strict-Transport-Security`, but the `_headers` file used
 on the Cloudflare Pages rollback path omitted it (CSP and the rest matched
 exactly). Added for parity so the fallback path is equally hardened.
 
+## Campaign 2 — full feature + abuse audit (2026-08-10, v1.6.0 → v1.6.1)
+
+A second adversarial pass after the abuse controls shipped, focused on malicious
+content injection (URLs + XSS) and full feature coverage. 71/72 automated API
+checks passed (the one "fail" was a wrong assertion — `GET /api/snapshot` with no
+slug correctly 404s, not 405). Everything below was tested against a live local
+instance and, where safe, production.
+
+**The linchpin, proven end-to-end:** a maximally hostile *long* link — which
+bypasses the server filter entirely, since long links are client-encoded and
+never validated — was loaded in a real browser. Name = `<img onerror><script>` +
+`</title>` breakout; comments = `http://evil…/phish`, `javascript:alert()`,
+`data:text/html,<script>`, `<img onerror>`, `<svg onload>`. Result: **0 injected
+scripts, 0 onerror images, 0 onload svgs, 0 clickable links to any user URL**,
+clean console. Every payload rendered as inert text. The only anchors on any
+shelf page are the app's own `https://…amazon.com` buy links. Confirmed on all
+three render paths: long-link viewer, short-link viewer, and the server `/s/`
+OG/title injection (all user values `html.escape`d).
+
+### F6 — Rare/abuse TLDs bypassed the bare-domain name filter — **LOW** — FIXED (v1.6.1)
+
+The v1.6.0 name filter blocked common bare domains (`.com/.net/…`) but not rare
+or abuse-heavy TLDs, so a shelf named `invoice.zip` or `deals.pizza` stored.
+Impact was capped (names are never clickable — only unfurl text), but `.zip`/
+`.mov` are real file-lookalike phishing TLDs and worth closing. Extended the TLD
+set (`_BARE_TLDS` in server.py, mirrored in lib.js) with file-lookalikes, cheap
+phishing generics, and common ccTLDs. Verified no false positives on legitimate
+names (`Vol. 2 favorites (J.R.R. picks)`, `C.S. Lewis`). Tests added both sides.
+
+### Accepted residuals (all non-clickable, all low)
+
+The URL filter is spam friction, not a classifier — the guarantee is that stored
+text is never clickable or executable (proven above). These store but are inert:
+
+- **Defanged/obfuscated forms in comments:** `hxxp://`, `http:` (no slashes),
+  `evil dot com`, homoglyph/ideographic dots. Not real URLs; a victim would have
+  to retype them by hand.
+- **Bare domains in comments** (by design — real notes say "found on archive.org").
+- **`data:` / `javascript:` schemes as comment text** — inert; CSP also forbids
+  execution independently.
+- **Homoglyph/unicode-dot domains in names** — render as visibly odd text, not
+  reproducible by a victim.
+
+Chasing these further risks false positives on real book notes for no real
+safety gain, so they are documented and accepted rather than filtered.
+
+### Features exercised (all pass)
+
+Live auto-search + suggestions · add-from-search with OpenLibrary hydration
+(title, author, cover, genres, https buy links) · rating/status/comment · the
+client-side URL guard (URL comment and `evil.com` shelf name both rejected in
+the real UI, clean names accepted) · multiple shelves (create/rename/delete) ·
+create short link · Goodreads CSV import with URL-stripping from reviews ·
+Year-in-review card (canvas renders) · Compare shelves (overlap + agreement).
+
+### Rate limiting (live)
+
+With the per-IP cap set to 5, a burst of 7 mints returned exactly 5×200 then
+2×429; distinct IPs are independent and a global daily ceiling backs it up
+(unit-tested). A 429 falls back to the long link with a friendly notice.
+
 ## Verified robust (attacked, held)
 
 | Area | Test | Result |

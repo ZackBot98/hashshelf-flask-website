@@ -64,7 +64,11 @@ const check = (name, cond, extra) => {
   check('comment: ordinary text fine', !L.commentHasUrl('Loved it. 4.5 stars, Vol. 2 was better'));
   check('name: blocks bare domains (unfurl title surface)', L.nameHasUrl('great deals at evil.com'));
   check('name: blocks www forms', L.nameHasUrl('www.evil.example picks'));
+  check('name: blocks file-lookalike .zip TLD', L.nameHasUrl('invoice.zip'));
+  check('name: blocks .mov TLD', L.nameHasUrl('watch demo.mov'));
+  check('name: blocks abuse TLD .icu', L.nameHasUrl('login evil.icu'));
   check('name: ordinary punctuation fine', !L.nameHasUrl('Vol. 2 favorites (J.R.R. picks)'));
+  check('name: initials-with-dots fine', !L.nameHasUrl('Books by C.S. Lewis & J.K.'));
   check('stripUrls removes link, keeps note',
     L.stripUrls('Loved it! https://evil.example/review full thoughts there') === 'Loved it! full thoughts there');
 

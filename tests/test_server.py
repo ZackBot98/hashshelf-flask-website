@@ -374,9 +374,16 @@ class SnapshotEndpointTests(unittest.TestCase):
         def mint(snap):
             return self.client.post("/api/snapshot", json={"payload": make_payload(snap)})
 
-        blocked_names = ["Deals at https://evil.example", "see WWW.evil.example", "visit evil.com now"]
+        blocked_names = [
+            "Deals at https://evil.example", "see WWW.evil.example", "visit evil.com now",
+            "invoice.zip", "watch demo.mov", "promo evil.xyz", "login evil.icu",
+        ]
         for bad in blocked_names:
             self.assertEqual(mint(dict(VALID_SNAPSHOT, name=bad)).status_code, 400, bad)
+
+        # No false positives on legitimate initials-with-dots names.
+        for ok in ["Vol. 2 favorites (J.R.R. picks)", "Books by C.S. Lewis & J.K.", "Sci-Fi 2026"]:
+            self.assertEqual(mint(dict(VALID_SNAPSHOT, name=ok)).status_code, 200, ok)
 
         def with_comment(c):
             return {"v": 1, "name": "Zack", "books": [

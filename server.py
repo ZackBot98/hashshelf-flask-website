@@ -32,7 +32,7 @@ import requests
 from collections import deque
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.6.1"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -56,11 +56,18 @@ ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
 # domain's credibility) and also reject bare domains. Mirrored in lib.js —
 # keep the two in sync so anything addable stays shortenable.
 URL_IN_TEXT_RE = re.compile(r"(?:https?://|ftp://|www\.)", re.I)
-BARE_DOMAIN_RE = re.compile(
-    r"\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|"
-    r"site|online|top|club|cc|to|tv|link|click|app|dev|shop|store)\b",
-    re.I,
+# Bare-domain TLDs to reject in shelf names (names become the unfurl title).
+# Covers the common generics/ccTLDs plus the abuse-heavy set: file-lookalikes
+# (.zip/.mov), cheap phishing generics (.icu/.sbs/.cfd/.lol/...), and the
+# country codes an abuser reaches for first. Not exhaustive by design — the
+# real guarantee is that stored text is never clickable; this is spam friction.
+_BARE_TLDS = (
+    "com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|"
+    "cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|"
+    "monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|"
+    "website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su"
 )
+BARE_DOMAIN_RE = re.compile(rf"\b[a-z0-9-]+\.(?:{_BARE_TLDS})\b", re.I)
 
 STATIC_FILES = {
     "index.html", "about.html", "guide.html", "styles.css", "ui.js", "lib.js", "snapshot.js",

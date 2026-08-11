@@ -9,7 +9,8 @@
   // bare domains. Mirrors URL_IN_TEXT_RE / BARE_DOMAIN_RE in server.py — keep
   // in sync so anything addable stays shortenable.
   const URL_IN_TEXT_RE = /(?:https?:\/\/|ftp:\/\/|www\.)/i;
-  const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store)\b/i;
+  // Keep this TLD set in sync with _BARE_TLDS in server.py.
+  const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su)\b/i;
 
   function commentHasUrl(text) {
     return URL_IN_TEXT_RE.test(String(text || ''));
