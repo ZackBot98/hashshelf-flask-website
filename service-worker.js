@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hashshelf-cache-v57';
+const CACHE_NAME = 'hashshelf-cache-v58';
 const API_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const ASSETS = [
   '/',
@@ -60,6 +60,17 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);
+
+    // Navigations are network-first: /s/<slug> pages are server-rendered with a
+    // per-shelf snapshot, and a cached app shell would mask both their content
+    // and any template fix. Fall back to the cached shell only when offline.
+    if (req.mode === 'navigate') {
+      try {
+        return await fetch(req);
+      } catch (err) {
+        return (await cache.match(req)) || (await cache.match('/index.html')) || Response.error();
+      }
+    }
 
     // Cache-first with TTL for OpenLibrary + our search proxy; stale on error
     if (isOpenLibrary || isSearch) {

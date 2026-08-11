@@ -31,7 +31,7 @@ from hashlib import sha256
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.8"
+APP_VERSION = "1.5.9"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -804,7 +804,10 @@ def snapshot_page(slug):
     # alphabet is [A-Za-z0-9_.-]; escape anyway as defense in depth.
     bootstrap = f'<meta name="hashshelf-snapshot" content="#{html.escape(payload, quote=True)}" />'
     page = page.replace("</head>", "    " + bootstrap + "\n  </head>", 1)
-    return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=3600"}
+    # no-cache (revalidate), not max-age: the per-slug data is immutable, but
+    # caching the HTML template for an hour would freeze template fixes (and did
+    # — a CSP fix stayed masked behind cached /s/ pages). 304s keep it cheap.
+    return page, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache"}
 
 
 # Locks the browser to exactly what the app is: same-origin code, OpenLibrary
