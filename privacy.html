@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<!--
+  HashShelf — Privacy Policy (DRAFT).
+  Every factual claim here reflects the app's current architecture (no accounts,
+  no cookies, no analytics; server stores an OpenLibrary cache + shortened
+  snapshots; rate-limit IPs are transient/in-memory; host + CDN keep standard
+  access logs). If you change what the app collects, update this to match.
+  Fill the bracketed [ ] placeholders and have counsel review before launch.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy — HashShelf</title>
+    <meta name="description" content="What HashShelf does and doesn't collect. Short version: no accounts, no tracking, and the link is the data." />
+    <meta property="og:title" content="Privacy Policy — HashShelf" />
+    <meta property="og:description" content="What HashShelf does and doesn't collect. Short version: no accounts, no tracking, and the link is the data." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://hashshelf.com/privacy.html" />
+    <meta name="theme-color" content="#fcfbf8" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cstyle%3E.i%7Bfill:%23191817%7D@media(prefers-color-scheme:dark)%7B.i%7Bfill:%23e9e5dc%7D%7D%3C/style%3E%3Crect class='i' x='21' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='38' y='8' width='5' height='48' rx='1.5'/%3E%3Crect class='i' x='8' y='25' width='48' height='4.5' rx='1.5'/%3E%3Crect class='i' x='8' y='42' width='48' height='4.5' rx='1.5'/%3E%3Crect x='29' y='14' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3Crect x='12' y='16' width='4' height='9' rx='1' fill='%23c23b22'/%3E%3Crect x='47' y='31' width='4' height='11' rx='1' fill='%23c23b22'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand brand-link" href="/">
+        <svg class="logo-mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+          <rect x="21" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="38" y="8" width="5" height="48" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="25" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="8" y="42" width="48" height="4.5" rx="1.5" fill="currentColor"/>
+          <rect x="29" y="14" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="12" y="16" width="4" height="9" rx="1" fill="#c23b22"/>
+          <rect x="47" y="31" width="4" height="11" rx="1" fill="#c23b22"/>
+          <rect x="29.5" y="33" width="4" height="9" rx="1" fill="#c23b22" transform="rotate(8 31.5 37)"/>
+        </svg>
+        <span class="title">HashShelf</span>
+      </a>
+      <div class="header-actions"><a class="link" href="/">Your shelf</a> <a class="link" href="/terms.html">Terms</a></div>
+    </header>
+
+    <main class="legal">
+      <div class="kicker">Legal</div>
+      <h1>Privacy Policy</h1>
+      <p class="legal-meta">Effective 11 August 2026 · Last updated 11 August 2026</p>
+
+      <p class="lede">HashShelf was built so that it doesn't need to know who you are. There are no
+      accounts and no tracking, and your reading list lives in the link rather than in a profile on
+      our server. This policy explains, honestly, the little that is stored anyway.</p>
+
+      <div class="callout"><strong>The short version.</strong> No accounts. No cookies. No analytics
+      or ad trackers. We don't sell data — we don't have the kind to sell. Your shelf travels inside
+      the link; a full ("long") link never reaches our server at all. We store a cache of public book
+      facts, and — only if you choose to shorten a shelf — a copy of that shelf. Our host and CDN keep
+      standard access logs, as every website's does.</div>
+
+      <h2><span class="no">1</span> Who this covers</h2>
+      <p>This policy applies to the HashShelf website at <code>hashshelf.com</code> and everything
+      served from it (the "Service"), operated by <strong>[OPERATOR — "ZackBot98," or your legal
+      name/entity once formed]</strong> ("we," "us"). It doesn't cover third-party sites you reach
+      through the Service, such as Amazon or Open Library, which have their own policies.</p>
+
+      <h2><span class="no">2</span> What we do <em>not</em> collect</h2>
+      <ul>
+        <li>No accounts, names, emails, or passwords — there's nothing to sign up for.</li>
+        <li>No cookies, no advertising pixels, no third-party analytics or tracking scripts.</li>
+        <li>No cross-site tracking, and no selling, renting, or trading of personal information.</li>
+        <li>No profile of you, your reading, or your behavior.</li>
+      </ul>
+
+      <h2><span class="no">3</span> What is stored, and where</h2>
+      <p>Here is everything, laid out by where it lives:</p>
+      <dl>
+        <dt>On your device</dt>
+        <dd>Your shelves, a cache of book details, and the set of links you created are kept in your
+        browser's local storage, and the app's files are kept in a service-worker cache so it works
+        offline. This data stays on your device and is not sent to us — except that its contents
+        become part of a link when you share one, and become a stored snapshot if you shorten one.
+        You can clear it any time by clearing your browser's site data.</dd>
+
+        <dt>Inside your links</dt>
+        <dd>A HashShelf shelf is encoded into the link itself (the part after the <code>#</code>).
+        Browsers do not transmit that fragment to servers, so the contents of a <strong>full ("long")
+        link never reach us</strong>. Anyone you send a link to can read the shelf it contains — so
+        share links the way you'd share a note.</dd>
+
+        <dt>On our server — book cache</dt>
+        <dd>To avoid hammering Open Library, we cache public book facts (titles, authors, cover
+        references, subjects/genres, and search results). This is information about <em>books</em>,
+        not about you.</dd>
+
+        <dt>On our server — shortened shelves</dt>
+        <dd>When, and only when, you choose to create a short link, a copy of that shelf (its name,
+        books, ratings, statuses, and comments) is stored so we can serve it back at its
+        <code>hashshelf.com/s/…</code> address. It is content-addressed and carries no account or
+        identity. You can ask us to remove one (Section 7).</dd>
+
+        <dt>On our server — rate-limiting</dt>
+        <dd>To prevent abuse, we briefly hold IP addresses in memory to count how many short links
+        an address creates. These counters are transient, are not written to our database, and are
+        discarded when the server restarts.</dd>
+
+        <dt>With our host &amp; CDN</dt>
+        <dd>Like every website, the Service runs behind infrastructure providers
+        (<a class="link" href="https://render.com" rel="noopener">Render</a> for hosting,
+        <a class="link" href="https://www.cloudflare.com" rel="noopener">Cloudflare</a> for DNS/CDN and
+        security) that keep standard server access logs. Those logs can include your IP address, the
+        time of a request, the page requested, and general browser/device information, and are used
+        to operate, secure, and troubleshoot the Service. They're handled under those providers'
+        privacy policies.</dd>
+      </dl>
+
+      <h2><span class="no">4</span> Cookies</h2>
+      <p>We don't set cookies. The app uses your browser's local storage to remember your shelves on
+      your own device; unlike cookies, local storage isn't attached to network requests and isn't
+      sent to us.</p>
+
+      <h2><span class="no">5</span> Third parties</h2>
+      <ul>
+        <li><strong>Open Library / Internet Archive.</strong> Book searches and lookups are proxied
+        through our server to Open Library; book cover images load directly from Open Library and the
+        Internet Archive to your browser, which means those services receive your IP address and which
+        cover you're viewing, under their policies.</li>
+        <li><strong>Amazon Associates.</strong> "Buy" links point to Amazon and carry our affiliate
+        tag. If you click one, Amazon receives that request and handles it under Amazon's privacy
+        policy; the tag identifies the referral to us, not you. We don't receive your Amazon activity
+        or purchases — only aggregate commission reporting.</li>
+        <li><strong>Hosting &amp; network.</strong> Render and Cloudflare process requests as described
+        in Section 3.</li>
+      </ul>
+
+      <h2><span class="no">6</span> How long things are kept</h2>
+      <p>Cached book facts are refreshed or expired over time as part of normal operation. Shortened
+      shelves are kept until they are removed — by us for a Terms violation, or at your request.
+      Device storage stays until you clear it. Provider access logs follow our host's and CDN's own
+      retention schedules.</p>
+
+      <h2><span class="no">7</span> Your choices &amp; rights</h2>
+      <ul>
+        <li><strong>Keep it entirely off our server.</strong> Use full (long) links instead of short
+        links; the shelf then never leaves your device except inside the link you share.</li>
+        <li><strong>Remove a short link.</strong> Email us the <code>hashshelf.com/s/…</code> URL at
+        <a class="link" href="mailto:report@hashshelf.com">report@hashshelf.com</a> and we'll remove the
+        stored snapshot.</li>
+        <li><strong>Clear your device data.</strong> Clearing your browser's site data for
+        <code>hashshelf.com</code> removes your shelves and caches from that device.</li>
+        <li><strong>Regional rights.</strong> Depending on where you live (for example, the EEA/UK
+        under the GDPR, or California under the CCPA/CPRA), you may have rights to access, correct, or
+        delete personal information, and not to be discriminated against for exercising them. Because
+        we hold so little and none of it is tied to an identity, these usually amount to removing a
+        short link or your device data — but you're welcome to contact us about any of them.</li>
+      </ul>
+
+      <h2><span class="no">8</span> Children's privacy</h2>
+      <p>The Service is not directed to children under 13, and we do not knowingly collect personal
+      information from them. If you believe a child has provided personal information, contact us and
+      we'll address it.</p>
+
+      <h2><span class="no">9</span> International users</h2>
+      <p>The Service is operated from, and hosted in, the United States. If you use it from elsewhere,
+      you understand that your requests are processed in the United States, which may have different
+      data-protection laws than your country.</p>
+
+      <h2><span class="no">10</span> Security</h2>
+      <p>The Service is served over HTTPS with a strict content-security policy and other protective
+      headers, and shared shelves are integrity-checked. No method of transmission or storage is
+      perfectly secure, so we can't guarantee absolute security — but by design there is very little
+      about you to protect.</p>
+
+      <h2><span class="no">11</span> Changes to this policy</h2>
+      <p>If we change what the Service collects or how we handle it, we'll update this page and revise
+      the "Last updated" date. Continued use after a change means you accept the updated policy.</p>
+
+      <h2><span class="no">12</span> Contact</h2>
+      <p>Privacy questions and requests: <a class="link" href="mailto:report@hashshelf.com">report@hashshelf.com</a>.</p>
+
+      <a class="link backlink" href="/">&larr; Back to your shelf</a>
+    </main>
+  </body>
+</html>

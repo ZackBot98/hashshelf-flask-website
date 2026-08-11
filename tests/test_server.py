@@ -169,10 +169,21 @@ class ApiTests(unittest.TestCase):
         for path, want in [("/ui.js", 200), ("/vendor/fflate.min.js", 200),
                            ("/robots.txt", 200), ("/genres.json", 200),
                            ("/about.html", 200), ("/guide.html", 200),
+                           ("/terms.html", 200), ("/privacy.html", 200),
                            ("/server.py", 404), ("/render.yaml", 404),
                            ("/requirements.txt", 404), ("/data/hashshelf.db", 404),
                            ("/.gitignore", 404), ("/tests/test_server.py", 404)]:
             self.assertEqual(self.client.get(path).status_code, want, path)
+
+    def test_legal_pages_content(self):
+        # Terms/Privacy must actually render their content and cross-link.
+        terms = self.client.get("/terms.html").get_data(as_text=True)
+        self.assertIn("Terms of Service", terms)
+        self.assertIn("Acceptable use", terms)
+        self.assertIn("/privacy.html", terms)
+        privacy = self.client.get("/privacy.html").get_data(as_text=True)
+        self.assertIn("Privacy Policy", privacy)
+        self.assertIn("/terms.html", privacy)
 
     def test_path_traversal_blocked(self):
         # QA-found (pre-1.5.5): vendor/..%2fserver.py bypassed the allowlist and

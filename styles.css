@@ -358,3 +358,30 @@ button.primary:disabled:hover { background: var(--red); color: #fcfbf8; }
       }
       .tip strong { color: var(--ink); font-weight: 600; letter-spacing: .06em; }
       .backlink { display: inline-block; margin-top: 30px; }
+
+/* ---- terms.html / privacy.html (inline for CSP style-src 'self') ---- */
+      .legal { max-width: 680px; margin: 0 auto; padding: 8px 20px 72px; }
+      .legal h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; margin: 34px 0 4px; }
+      .legal .kicker { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--red); }
+      .legal .legal-meta { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .04em; margin: 2px 0 0; }
+      .legal .lede { font-family: var(--serif); font-size: 17px; line-height: 1.62; color: var(--muted); margin: 14px 0 18px; }
+      .legal h2 {
+        font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+        color: var(--muted); font-weight: 600; font-family: var(--mono);
+        margin: 36px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule);
+      }
+      .legal h2 .no { color: var(--red); margin-right: 10px; }
+      .legal h3 { font-family: var(--serif); font-weight: 600; font-size: 16px; margin: 18px 0 6px; }
+      .legal p { font-family: var(--serif); font-size: 16px; line-height: 1.62; margin: 0 0 12px; }
+      .legal ul, .legal ol { margin: 0 0 12px; padding-left: 22px; }
+      .legal li { font-family: var(--serif); font-size: 16px; line-height: 1.55; margin: 5px 0; }
+      .legal code { font-family: var(--mono); font-size: 13.5px; }
+      .legal dl { margin: 0 0 12px; }
+      .legal dt { font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--ink); text-transform: uppercase; margin: 14px 0 3px; }
+      .legal dd { font-family: var(--serif); font-size: 16px; line-height: 1.58; margin: 0; }
+      .legal .callout {
+        font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--muted);
+        border-left: 2px solid var(--red); padding: 8px 0 8px 14px; margin: 0 0 16px;
+      }
+      .legal .callout strong { color: var(--ink); font-weight: 600; }
+      .legal strong { font-weight: 600; }

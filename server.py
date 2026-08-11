@@ -32,7 +32,7 @@ import requests
 from collections import deque
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.6.1"
+APP_VERSION = "1.7.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -70,7 +70,8 @@ _BARE_TLDS = (
 BARE_DOMAIN_RE = re.compile(rf"\b[a-z0-9-]+\.(?:{_BARE_TLDS})\b", re.I)
 
 STATIC_FILES = {
-    "index.html", "about.html", "guide.html", "styles.css", "ui.js", "lib.js", "snapshot.js",
+    "index.html", "about.html", "guide.html", "terms.html", "privacy.html",
+    "styles.css", "ui.js", "lib.js", "snapshot.js",
     "openlibrary.js", "service-worker.js", "manifest.json", "genres.json",
     "robots.txt", "config.js",
 }
