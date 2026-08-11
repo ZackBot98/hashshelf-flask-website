@@ -87,6 +87,13 @@ OpenGraph unfurl still worked (meta tags, not scripts), which masked it.
   `<script>` must have `src=`), which would have caught this.
 - **Verified:** a real short link renders the full shelf in a browser with zero
   CSP violations, locally and on production.
+- **Follow-on (v1.5.9):** the `/s/` HTML was served `max-age=3600` and the
+  service worker was cache-first for navigations, so the fix was masked behind
+  stale cached pages for already-visited links. Changed `/s/` to `no-cache` and
+  the SW to network-first for navigations (offline still falls back to the
+  cached shell). Fresh links + new visitors now work immediately; devices that
+  cached a broken `/s/` page during the outage self-heal within ~1 h or on a
+  hard refresh.
 
 ### F4 — HSTS missing from static-fallback `_headers` — **LOW** — FIXED (v1.5.6)
 
