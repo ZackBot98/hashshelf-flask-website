@@ -17,6 +17,11 @@ os.environ["HASHSHELF_DB"] = os.path.join(tempfile.mkdtemp(), "test.db")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import server  # noqa: E402
 
+# The suite mints many snapshots from one test-client IP; keep the abuse caps
+# out of the way except in MintRateLimitTests, which sets its own values.
+server.MINT_PER_IP_HOUR = 10000
+server.MINT_GLOBAL_PER_DAY = 100000
+
 
 def make_payload(obj):
     """Build a valid snapshot payload the way the client does (raw deflate)."""
@@ -361,6 +366,56 @@ class SnapshotEndpointTests(unittest.TestCase):
         self.assertEqual(slug, sha256_of(payload)[:12])
         got = self.client.get(f"/api/snapshot/{slug}")
         self.assertEqual(got.get_json()["payload"], payload)
+
+    def test_urls_blocked_in_stored_shelves(self):
+        # Abuse control (v1.6.0): a hashshelf.com page must never carry someone
+        # else's URL. Names are stricter than comments because they become the
+        # unfurl title on /s/ links (borrowed-domain phishing surface).
+        def mint(snap):
+            return self.client.post("/api/snapshot", json={"payload": make_payload(snap)})
+
+        blocked_names = ["Deals at https://evil.example", "see WWW.evil.example", "visit evil.com now"]
+        for bad in blocked_names:
+            self.assertEqual(mint(dict(VALID_SNAPSHOT, name=bad)).status_code, 400, bad)
+
+        def with_comment(c):
+            return {"v": 1, "name": "Zack", "books": [
+                {"idType": "work", "id": "OL45804W", "status": "want", "comment": c}]}
+
+        for bad in ["grab it https://evil.example/x", "at WWW.evil.example", "ftp://drop.example"]:
+            self.assertEqual(mint(with_comment(bad)).status_code, 400, bad)
+
+        # Bare domains stay allowed in comments (real notes say "found on
+        # archive.org"); ordinary punctuation never false-positives.
+        self.assertEqual(mint(with_comment("found this on archive.org")).status_code, 200)
+        self.assertEqual(mint(dict(VALID_SNAPSHOT, name="Vol. 2 favorites (J.R.R. picks)")).status_code, 200)
+
+    def test_mint_rate_limits(self):
+        # Per-IP hourly cap, distinct IPs independent, global daily ceiling.
+        def mint(i, ip=None):
+            headers = {"CF-Connecting-IP": ip} if ip else {}
+            snap = dict(VALID_SNAPSHOT, name=f"rl shelf {i}")
+            return self.client.post(
+                "/api/snapshot", json={"payload": make_payload(snap)}, headers=headers)
+
+        old_ip, old_day = server.MINT_PER_IP_HOUR, server.MINT_GLOBAL_PER_DAY
+        try:
+            server._mint_by_ip.clear()
+            server._mint_day.update(day=-1, count=0)
+            server.MINT_PER_IP_HOUR = 3
+            for i in range(3):
+                self.assertEqual(mint(i).status_code, 200)
+            self.assertEqual(mint(99).status_code, 429)          # 4th from same IP
+            self.assertEqual(mint(100, ip="203.0.113.7").status_code, 200)  # other IP fine
+
+            server.MINT_PER_IP_HOUR = 10000
+            server.MINT_GLOBAL_PER_DAY = server._mint_day["count"] + 1
+            self.assertEqual(mint(101, ip="203.0.113.8").status_code, 200)
+            self.assertEqual(mint(102, ip="203.0.113.9").status_code, 429)  # global ceiling
+        finally:
+            server.MINT_PER_IP_HOUR, server.MINT_GLOBAL_PER_DAY = old_ip, old_day
+            server._mint_by_ip.clear()
+            server._mint_day.update(day=-1, count=0)
 
     def test_s_page_snapshot_is_csp_safe(self):
         # QA-found (v1.5.8): the snapshot bootstrap must be a <meta> tag, not an

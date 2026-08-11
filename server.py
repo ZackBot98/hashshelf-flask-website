@@ -29,9 +29,10 @@ from concurrent.futures import ThreadPoolExecutor
 from hashlib import sha256
 
 import requests
+from collections import deque
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.5.9"
+APP_VERSION = "1.6.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -48,6 +49,18 @@ MAX_SNAPSHOT_BOOKS = 1000
 ALLOWED_ID_TYPES = {"work", "isbn", "edition"}
 ALLOWED_STATUSES = {"want", "reading", "finished", "did not finish"}
 ID_RE = re.compile(r"^[A-Za-z0-9 ._:-]{1,64}$")
+
+# Abuse controls: stored shelves are link-free text, so a hashshelf.com page can
+# never deliver someone else's URL. Comments reject pasteable link forms; names
+# are stricter (they become the unfurl title on /s/ pages, borrowing this
+# domain's credibility) and also reject bare domains. Mirrored in lib.js —
+# keep the two in sync so anything addable stays shortenable.
+URL_IN_TEXT_RE = re.compile(r"(?:https?://|ftp://|www\.)", re.I)
+BARE_DOMAIN_RE = re.compile(
+    r"\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|"
+    r"site|online|top|club|cc|to|tv|link|click|app|dev|shop|store)\b",
+    re.I,
+)
 
 STATIC_FILES = {
     "index.html", "about.html", "guide.html", "styles.css", "ui.js", "lib.js", "snapshot.js",
@@ -712,6 +725,8 @@ def _validate_snapshot_payload(payload):
     name = data.get("name")
     if name is not None and (not isinstance(name, str) or len(name) > 120):
         abort(400, "bad name")
+    if name and (URL_IN_TEXT_RE.search(name) or BARE_DOMAIN_RE.search(name)):
+        abort(400, "links are not allowed in shelf names")
     for b in data["books"]:
         if not isinstance(b, dict) or set(b) - {"idType", "id", "rating", "comment", "status"}:
             abort(400, "bad book entry")
@@ -723,11 +738,64 @@ def _validate_snapshot_payload(payload):
             abort(400, "bad rating")
         if "comment" in b and (not isinstance(b["comment"], str) or len(b["comment"]) > 2000):
             abort(400, "bad comment")
+        if "comment" in b and URL_IN_TEXT_RE.search(b["comment"]):
+            abort(400, "links are not allowed in comments")
     return digest, (name or None), len(data["books"])
+
+
+# ------------------------------------------------ snapshot minting abuse caps
+
+MINT_PER_IP_HOUR = int(os.environ.get("HASHSHELF_MINT_PER_IP_HOUR", "30"))
+MINT_GLOBAL_PER_DAY = int(os.environ.get("HASHSHELF_MINT_GLOBAL_PER_DAY", "2000"))
+
+_mint_lock = threading.Lock()
+_mint_by_ip = {}                      # ip -> deque of recent mint timestamps
+_mint_day = {"day": -1, "count": 0}   # global ceiling, resets at UTC midnight
+
+
+def _client_ip():
+    """Real client IP behind Cloudflare -> Render's proxy -> Flask."""
+    return (
+        request.headers.get("CF-Connecting-IP")
+        or (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+        or request.remote_addr
+        or "?"
+    )
+
+
+def _mint_allowed(ip, now=None):
+    """Per-IP hourly + global daily caps on snapshot mints.
+
+    In-memory is correct here: the app runs as one gunicorn process, and losing
+    counters on restart only makes us briefly generous. The global ceiling is
+    the backstop against per-IP evasion (spoofed CF headers, botnets) and
+    doubles as a disk-fill guard for the snapshot store.
+    """
+    now = time.time() if now is None else now
+    day = int(now // 86400)
+    with _mint_lock:
+        if _mint_day["day"] != day:
+            _mint_day["day"], _mint_day["count"] = day, 0
+        if _mint_day["count"] >= MINT_GLOBAL_PER_DAY:
+            return False
+        hits = _mint_by_ip.get(ip)
+        if hits is None:
+            if len(_mint_by_ip) > 10000:  # bound memory, same policy as _inflight_locks
+                _mint_by_ip.clear()
+            hits = _mint_by_ip[ip] = deque()
+        while hits and hits[0] <= now - 3600:
+            hits.popleft()
+        if len(hits) >= MINT_PER_IP_HOUR:
+            return False
+        hits.append(now)
+        _mint_day["count"] += 1
+        return True
 
 
 @app.post("/api/snapshot")
 def api_snapshot():
+    if not _mint_allowed(_client_ip()):
+        abort(429, "short-link creation is rate-limited; the full-length link still works")
     body = request.get_json(force=True, silent=True) or {}
     payload = body.get("payload")
     digest, name, count = _validate_snapshot_payload(payload)

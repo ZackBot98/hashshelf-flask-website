@@ -98,7 +98,7 @@ OpenLibrary subjects are messy free text ("Fiction, science fiction, general", "
 
 - `POST /api/books` — bulk hydration: `{books: [{idType, id}]}` → assembled `{title, authors, coverUrl, genres, workId}` per book. SQLite-cached (60d TTL), so OpenLibrary is hit at most once per book per TTL across *all* users. The client batches same-tick requests, so rendering a whole shelf is one round trip.
 - `GET /api/search?q=` — cached OpenLibrary search (24h TTL) with English-edition title/cover enrichment done server-side.
-- `POST /api/snapshot` — validates a snapshot payload (integrity, deflate, schema) and stores it content-addressed; returns the short-link slug.
+- `POST /api/snapshot` — validates a snapshot payload (integrity, deflate, schema, link-free text) and stores it content-addressed; returns the short-link slug. Minting is rate-limited per IP (default 30/hour) with a global daily ceiling (default 2000) — both env-tunable (`HASHSHELF_MINT_PER_IP_HOUR`, `HASHSHELF_MINT_GLOBAL_PER_DAY`).
 - `GET /api/snapshot/<slug>` — resolves a short link back to its payload (used by Compare).
 - `GET /s/<slug>` — serves the app with per-shelf OpenGraph tags (link unfurls!) and the snapshot inlined.
 - `GET /healthz` — `{ok, version, db_on_disk, books_cached}`; `db_on_disk` confirms the SQLite file lives on the persistent disk, `books_cached` makes cache growth observable.
@@ -160,6 +160,7 @@ id configured — if you run a copy locally, clear or replace it.
 - Shelf data leaves the browser only via links you share, or when you explicitly mint a short link (which stores that snapshot server-side).
 - The server stores no user identity: no accounts, no cookies, and nothing in the database ties data to a person. Short links are content-addressed blobs. (The hosting layer's standard access logs exist, as with any web host.)
 - All rendering uses `textContent` — comments from shared links cannot inject HTML.
+- **Stored shelves are link-free by policy.** Short-link creation rejects URLs in comments and URLs *or bare domains* in shelf names (the name becomes the unfurl title, a classic borrowed-domain phishing surface), and user text is never auto-linkified — so a `hashshelf.com` page can never deliver someone else's link. Goodreads import strips URLs from reviews rather than failing. Minting is rate-limited (per-IP + global) against spam campaigns and disk-fill.
 
 ## Contributing
 

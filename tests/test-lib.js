@@ -57,6 +57,26 @@ const check = (name, cond, extra) => {
   try { L.parseGoodreadsCsv('foo,bar\n1,2'); } catch { threw = true; }
   check('rejects non-goodreads csv', threw);
 
+  // --- link-free policy (parity with server.py URL_IN_TEXT_RE/BARE_DOMAIN_RE)
+  check('comment: blocks https URLs', L.commentHasUrl('grab it at https://evil.example/x'));
+  check('comment: blocks WWW. any case', L.commentHasUrl('see WWW.evil.example'));
+  check('comment: allows bare domains (real notes cite archive.org)', !L.commentHasUrl('found on archive.org'));
+  check('comment: ordinary text fine', !L.commentHasUrl('Loved it. 4.5 stars, Vol. 2 was better'));
+  check('name: blocks bare domains (unfurl title surface)', L.nameHasUrl('great deals at evil.com'));
+  check('name: blocks www forms', L.nameHasUrl('www.evil.example picks'));
+  check('name: ordinary punctuation fine', !L.nameHasUrl('Vol. 2 favorites (J.R.R. picks)'));
+  check('stripUrls removes link, keeps note',
+    L.stripUrls('Loved it! https://evil.example/review full thoughts there') === 'Loved it! full thoughts there');
+
+  // Goodreads reviews often contain links; import strips them, keeps the note
+  const grUrl = [
+    'Book Id,Title,Author,ISBN,ISBN13,My Rating,Average Rating,Number of Pages,Exclusive Shelf,My Review,Bookshelves',
+    '1,The Hobbit,J.R.R. Tolkien,"=""0547928246""","=""9780547928241""",5,4.28,366,read,"Great read, see https://my.blog/post for more",fantasy'
+  ].join('\n');
+  const grUrlBook = L.parseGoodreadsCsv(grUrl).books[0];
+  check('goodreads import strips URLs from reviews',
+    grUrlBook && grUrlBook.comment === 'Great read, see for more' && !L.commentHasUrl(grUrlBook.comment));
+
   // --- genres (parity cases with tests/test_server.py) --------------------
   check('genre punctuation fold', (await L.normalizeGenres(['Science-fiction'])).includes('Science Fiction'));
   check('one genre per subject, specific wins',

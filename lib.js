@@ -1,6 +1,34 @@
 /* HashShelf shared logic: CSV import, genres, compare, wrapped card.
    Pure functions where possible so they're testable outside the browser. */
 (function(root) {
+  // ------------------------------------------------------- link-free policy
+
+  // Shared shelves are link-free text, so a hashshelf.com page can never carry
+  // someone else's URL. Comments reject pasteable link forms; shelf names are
+  // stricter (they become the unfurl title on short links) and also reject
+  // bare domains. Mirrors URL_IN_TEXT_RE / BARE_DOMAIN_RE in server.py — keep
+  // in sync so anything addable stays shortenable.
+  const URL_IN_TEXT_RE = /(?:https?:\/\/|ftp:\/\/|www\.)/i;
+  const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store)\b/i;
+
+  function commentHasUrl(text) {
+    return URL_IN_TEXT_RE.test(String(text || ''));
+  }
+
+  function nameHasUrl(text) {
+    const s = String(text || '');
+    return URL_IN_TEXT_RE.test(s) || BARE_DOMAIN_RE.test(s);
+  }
+
+  // For imported text (Goodreads reviews often contain links): drop the URLs,
+  // keep the note. Erroring a 300-book import over one link would be hostile.
+  function stripUrls(text) {
+    return String(text || '')
+      .replace(/(?:https?:\/\/|ftp:\/\/|www\.)\S+/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   // ------------------------------------------------------------------ CSV
 
   // RFC 4180 parser: handles quoted fields, escaped quotes, embedded newlines.
@@ -73,7 +101,7 @@
 
       const ratingNum = Number(iRating >= 0 ? cells[iRating] : 0);
       const rating = Number.isFinite(ratingNum) && ratingNum > 0 ? Math.min(5, Math.round(ratingNum)) : undefined;
-      const comment = String((iReview >= 0 ? cells[iReview] : '') || '').trim().slice(0, 2000);
+      const comment = stripUrls(String((iReview >= 0 ? cells[iReview] : '') || '')).slice(0, 2000);
 
       books.push({
         idType: 'isbn',
@@ -509,6 +537,9 @@
     parseCsv,
     parseGoodreadsCsv,
     cleanIsbn,
+    commentHasUrl,
+    nameHasUrl,
+    stripUrls,
     normalizeGenres,
     toIsbn10,
     toIsbn13,

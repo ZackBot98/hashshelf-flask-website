@@ -639,6 +639,10 @@
       showNotice('That ID has characters HashShelf can’t use. Use an OpenLibrary Work ID (e.g. OL45804W) or an ISBN, or pick a search result.', 'error');
       return;
     }
+    if (HashShelfLib.commentHasUrl(comment)) {
+      showNotice('Links aren’t allowed in comments — shelves stay link-free so a shared page can never carry spam.', 'error');
+      return;
+    }
     const entry = { idType, id, status, ...(rating !== undefined ? { rating } : {}), ...(comment ? { comment } : {}) };
     if (editIndex !== null) {
       books[editIndex] = entry;
@@ -673,12 +677,14 @@
       // The long link is always a full copy of the data and works without it.
       let link = longLink;
       let labelled = 'link';
+      let mintStatus = 0;
       try {
         const res = await fetchWithTimeout('/api/snapshot', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ payload: hash.slice(1) })
         }, 6000);
+        mintStatus = res.status;
         if (res.ok) {
           const data = await res.json();
           if (data && data.slug) {
@@ -691,7 +697,9 @@
       const copied = await copyTextRobust(link);
       snapshotLinkInput.value = link;
       snapshotOutput.classList.remove('is-hidden');
-      if (labelled === 'link' && longLink.length > LONG_LINK_WARN) {
+      if (labelled === 'link' && mintStatus === 429) {
+        showNotice(`Short links are rate-limited right now, so you got the full link instead — it works exactly the same.${copied ? ' Copied.' : ''}`, 'ok', 6000);
+      } else if (labelled === 'link' && longLink.length > LONG_LINK_WARN) {
         showNotice(`Link copied, but it is ${longLink.length} characters — some apps truncate links this long. Short links need the HashShelf backend, which is currently unreachable.`, 'error');
       } else if (copied) {
         showNotice(`Copied ${labelled} to clipboard.`, 'ok', 2500);
@@ -1069,6 +1077,10 @@
     newShelfBtn.addEventListener('click', () => {
       const name = (prompt('Shelf name (this is the title on links you share):', 'New shelf') || '').trim();
       if (!name) return;
+      if (HashShelfLib.nameHasUrl(name)) {
+        showNotice('Links and web addresses aren’t allowed in shelf names — the name becomes the title on shared pages.', 'error');
+        return;
+      }
       const shelf = { id: newId(), name: name.slice(0, 60), books: [] };
       store.shelves.push(shelf);
       saveShelves();
@@ -1079,6 +1091,10 @@
       const shelf = activeShelf();
       const name = (prompt('Rename shelf (this is the title on links you share):', shelf.name) || '').trim();
       if (!name) return;
+      if (HashShelfLib.nameHasUrl(name)) {
+        showNotice('Links and web addresses aren’t allowed in shelf names — the name becomes the title on shared pages.', 'error');
+        return;
+      }
       shelf.name = name.slice(0, 60);
       saveShelves();
       renderShelfSelect();
