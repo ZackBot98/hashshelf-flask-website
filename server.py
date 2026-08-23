@@ -14,6 +14,7 @@ disposable OpenLibrary cache. Shelves are shared as self-contained links whose
 data rides in the URL fragment, which browsers never send to the server.
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -26,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.10.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")
@@ -52,6 +53,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("hashshelf")
 
 app = Flask(__name__, static_folder=None)
+# Cap request bodies well below any legitimate call (200 short book ids is a few
+# KB) so a huge POST can't buffer into memory and OOM the single worker. Werkzeug
+# returns 413 before reading the body.
+app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
 
 # ------------------------------------------------------------------ genres
 
@@ -133,6 +138,10 @@ def init_db():
         -- HashShelf stores no user content. Short links (the old `snapshots`
         -- table) were removed; drop it so no shared shelf is ever retained.
         DROP TABLE IF EXISTS snapshots;
+        -- Search cache is now keyed by a hash of the query (never the raw text);
+        -- clear any rows written under the old raw-text keys so no user-typed
+        -- string remains at rest. The cache is disposable and repopulates.
+        DELETE FROM searches;
         """
     )
     # Columns added after v1.2.0; CREATE TABLE IF NOT EXISTS won't backfill them
@@ -616,7 +625,11 @@ def api_search():
     if not q or len(q) > 200:
         abort(400, "missing or oversized q")
 
-    row = db().execute("SELECT results, fetched_at FROM searches WHERE q=?", (q,)).fetchone()
+    # Cache under a hash of the query, never the raw text, so no user-typed
+    # string is ever written to disk. The raw q is used only in-request for the
+    # upstream OpenLibrary call.
+    q_key = hashlib.sha256(q.encode("utf-8")).hexdigest()
+    row = db().execute("SELECT results, fetched_at FROM searches WHERE q=?", (q_key,)).fetchone()
     if row and _fresh(row[1], SEARCH_TTL):
         resp = jsonify(json.loads(row[0]))
         resp.headers["Cache-Control"] = "public, max-age=3600"
@@ -663,7 +676,7 @@ def api_search():
     result = {"docs": docs, "enriched": True}
     db().execute(
         "INSERT OR REPLACE INTO searches (q, results, fetched_at) VALUES (?,?,?)",
-        (q, json.dumps(result), int(time.time())),
+        (q_key, json.dumps(result), int(time.time())),
     )
     db().commit()
     resp = jsonify(result)
@@ -694,16 +707,37 @@ _CSP = (
 )
 
 
-@app.after_request
-def security_headers(resp):
-    h = resp.headers
-    h.setdefault("Content-Security-Policy", _CSP)
-    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    h.setdefault("X-Content-Type-Options", "nosniff")
-    h.setdefault("X-Frame-Options", "DENY")
-    h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-    h.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    return resp
+_SECURITY_HEADERS = (
+    ("Content-Security-Policy", _CSP),
+    ("Referrer-Policy", "strict-origin-when-cross-origin"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
+    ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
+)
+
+
+class SecurityHeadersMiddleware:
+    """Apply the security headers to EVERY response, including framework-level
+    500s and 413s that never pass through Flask's after_request hooks. Only adds
+    a header that isn't already present, so per-response overrides still win.
+    """
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        def _start(status, headers, exc_info=None):
+            present = {name.lower() for name, _ in headers}
+            for name, value in _SECURITY_HEADERS:
+                if name.lower() not in present:
+                    headers.append((name, value))
+            return start_response(status, headers, exc_info)
+
+        return self.wsgi_app(environ, _start)
+
+
+app.wsgi_app = SecurityHeadersMiddleware(app.wsgi_app)
 
 
 @app.get("/healthz")

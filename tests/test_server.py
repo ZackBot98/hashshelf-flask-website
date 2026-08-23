@@ -119,6 +119,28 @@ class ApiTests(unittest.TestCase):
         self.assertIn("Privacy Policy", privacy)
         self.assertIn("/terms.html", privacy)
 
+    def test_request_body_size_capped(self):
+        # Oversized POST must be refused (413) before buffering into memory.
+        big = b"x" * (300 * 1024)
+        r = self.client.post("/api/books", data=big, content_type="application/json")
+        self.assertEqual(r.status_code, 413)
+
+    def test_search_cached_under_hashed_key_not_raw(self):
+        import hashlib
+        routes = {
+            "/search.json": {"docs": [{"key": "/works/OL55W", "title": "Q"}]},
+            "/works/OL55W/editions": {"entries": []},
+            "/works/OL55W": {"key": "/works/OL55W", "title": "Q", "subjects": [], "authors": []},
+        }
+        with mock.patch.object(server, "ol_get", side_effect=fake_ol(routes)):
+            self.assertEqual(self.client.get("/api/search?q=Secret Query Phrase").status_code, 200)
+        raw = "secret query phrase"  # normalized: lowercased, whitespace-collapsed
+        keys = [row[0] for row in server.db().execute("SELECT q FROM searches").fetchall()]
+        self.assertIn(hashlib.sha256(raw.encode("utf-8")).hexdigest(), keys)  # stored hashed
+        self.assertNotIn(raw, keys)                                           # raw never stored
+        for k in keys:
+            self.assertRegex(k, r"^[0-9a-f]{64}$")                            # every key is a hash
+
     def test_path_traversal_blocked(self):
         # QA-found (pre-1.5.5): vendor/..%2fserver.py bypassed the allowlist and
         # served source. Every encoding of traversal must now 404, and no
@@ -294,6 +316,15 @@ class SecurityHeaderTests(unittest.TestCase):
             self.assertNotIn("<script>", body, path)
             self.assertNotIn("<style>", body, path)
             self.assertNotIn(' style="', body, path)
+
+    def test_headers_on_error_responses(self):
+        # The WSGI middleware must apply headers to error responses too (404/400),
+        # not just 200s — an uncaught 500 would otherwise ship bare.
+        for path in ("/definitely-not-a-file-xyz", "/api/search"):  # 404, 400
+            h = self.client.get(path).headers
+            self.assertIn("script-src 'self'", h.get("Content-Security-Policy", ""), path)
+            self.assertEqual(h.get("X-Content-Type-Options"), "nosniff", path)
+            self.assertEqual(h.get("X-Frame-Options"), "DENY", path)
 
 
 class ShortLinksRemovedTests(unittest.TestCase):

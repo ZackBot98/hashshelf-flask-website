@@ -159,7 +159,8 @@ id configured — if you run a copy locally, clear or replace it.
 - Snapshots (the shelf encoding carried in a link) are deterministic and integrity-checked — corruption detection, not authentication.
 - Shelf data leaves the browser only inside a link you choose to share, and that link — a URL fragment — is never transmitted to any server.
 - All rendering uses `textContent` — a shelf name from a shared link cannot inject HTML and is never turned into a clickable link.
-- **The codec is the link-free boundary.** A shelf's only free text is its (short) name; books have no comment field at all. `sanitizeName` strips URLs and bare domains and caps length on **both encode and decode**, so a hand-crafted or legacy link can't smuggle a link into a title either. The shelf-name form adds a friendly rejection on top.
+- **The codec is the link-free boundary.** A shelf's only free text is its (short, 50-char) name; books have no comment field at all. `sanitizeName` runs on **both encode and decode** and: removes invisible/format/bidi characters (zero-width, RLO/LRO, BOM, soft-hyphen), NFKC-normalizes to fold fullwidth/homoglyph lookalikes, then strips any URL or `host.tld` domain (denylist-free, so exotic TLDs can't slip through) — so a hand-crafted or legacy link can't smuggle a link, homoglyph, or hidden payload into a title. The shelf-name form adds a friendly rejection on top.
+- **Request bodies are capped** (`MAX_CONTENT_LENGTH` 256 KB) and security headers are applied by a WSGI middleware so they cover every response, including framework 500s. Search results are cached under a **hash** of the query, so raw search text is never written to disk.
 
 ## Contributing
 

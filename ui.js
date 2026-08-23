@@ -74,6 +74,7 @@
   let viewerGen = 0;   // invalidates in-flight viewer hydration
   let editorGen = 0;   // invalidates in-flight editor hydration
   let lastViewerBooks = null; // decoded books currently shown in the viewer
+  let lastViewerName = '';    // its shelf name, kept so "Compare with mine" labels it
   let wrappedCanvas = null;
 
   // ----------------------------------------------------------- shelf store
@@ -706,6 +707,7 @@
       const data = await HashShelfSnapshot.decodeFromHash(hashStr);
       if (viewerTitle) viewerTitle.textContent = data?.name || 'A shared shelf';
       lastViewerBooks = data.books;
+      lastViewerName = data?.name || '';
       switchToViewer();
       await renderViewer(data.books);
     } catch (err) {
@@ -1023,7 +1025,7 @@
     });
     importShelfBtn?.addEventListener('click', importViewerBooks);
     compareWithMineBtn?.addEventListener('click', async () => {
-      const hash = await HashShelfSnapshot.encodeSnapshot(lastViewerBooks || [], '');
+      const hash = await HashShelfSnapshot.encodeSnapshot(lastViewerBooks || [], lastViewerName || '');
       compareLinkInput.value = hash;
       switchToCompare();
       runCompare();

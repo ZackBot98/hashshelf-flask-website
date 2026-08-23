@@ -9,20 +9,28 @@
 
   // The shelf name is the only free text a shelf carries, and a name can arrive
   // inside a hand-crafted link that never passed through the UI — so this codec
-  // is the real boundary, not the form. sanitizeName strips anything
-  // link-shaped and hard-caps length; it runs on both encode AND decode, so no
-  // link (crafted, legacy, or imported) can smuggle a URL into a title.
+  // is the real boundary, not the form. sanitizeName neutralizes anything
+  // link-shaped or concealment-shaped and hard-caps length; it runs on both
+  // encode AND decode, so no link (crafted, legacy, or imported) can smuggle a
+  // URL or hidden payload into a title.
   const MAX_NAME = 50;
+  // Invisible / format / bidi / control characters: zero-width space & joiners,
+  // bidi embeddings/overrides/isolates, BOM, soft hyphen, C0/C1 controls. These
+  // both hide content and split tokens to dodge the URL check, so they go first.
+  const INVISIBLE_RE = /[\p{Cf}\p{Cc}]/gu;
+  // Explicit scheme / www forms, then ANY hostname.tld shape (denylist-free, so
+  // exotic TLDs like .gov/.tech can't slip through). Applied after NFKC folding.
   const URL_TOKEN_RE = /(?:https?:\/\/|ftp:\/\/|www\.)\S*/gi;
-  const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su)\b\S*/gi;
+  const DOMAIN_RE = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24}\b(?:[/?#]\S*)?/gi;
 
   function sanitizeName(name) {
-    return String(name || "")
-      .replace(URL_TOKEN_RE, " ")
-      .replace(BARE_DOMAIN_RE, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_NAME);
+    let s = String(name || "").replace(INVISIBLE_RE, " ");
+    // Fold compatibility/fullwidth homoglyphs (ｈｔｔｐ, 𝗵𝗍𝗍𝗉, ﬁ) to ASCII so a
+    // disguised scheme or domain is caught by the strippers below.
+    try { s = s.normalize("NFKC"); } catch (e) { /* ancient engine: skip */ }
+    s = s.replace(URL_TOKEN_RE, " ").replace(DOMAIN_RE, " ").replace(/\s+/g, " ").trim();
+    // Cap by code point, never splitting a surrogate pair into a lone half.
+    return Array.from(s).slice(0, MAX_NAME).join("");
   }
 
   function clampRating(value) {

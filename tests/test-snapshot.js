@@ -64,11 +64,27 @@ const check = (name, cond, extra) => {
   check('sanitizeName strips bare domains', S.sanitizeName('grab evil.com today') === 'grab today');
   check('sanitizeName strips .zip lookalikes', S.sanitizeName('open invoice.zip') === 'open');
   check('sanitizeName keeps legit titles', S.sanitizeName('Vol. 2 (J.R.R. picks)') === 'Vol. 2 (J.R.R. picks)');
-  check('sanitizeName caps length to MAX_NAME', S.sanitizeName('x'.repeat(200)).length === S.MAX_NAME);
-  // Decode path neutralizes a URL a raw/crafted link tried to hide in the name
-  const evilHash = await S.encodeSnapshot([{ idType: 'work', id: 'OL1W', status: 'want' }], 'go to http://evil.example');
+  check('sanitizeName keeps initials + emoji', S.sanitizeName('Beach Reads \u{1F3D6}️ 2026') === 'Beach Reads \u{1F3D6}️ 2026');
+  check('sanitizeName caps length to MAX_NAME (by code point)', [...S.sanitizeName('x'.repeat(200))].length === S.MAX_NAME);
+  // Concealment/bypass hardening (QA campaign): no invisible char, bidi control,
+  // homoglyph scheme, or exotic-TLD domain may survive.
+  const noInvisible = (s) => !/[­​-‏‪-‮⁠-⁯﻿]/.test(s);
+  const noLink = (s) => !/https?:|ftp:|www\.|[a-z0-9-]+\.[a-z]{2,}/i.test(s);
+  check('strips zero-width-joiner in scheme', noLink(S.sanitizeName('go htt‍p://evil.example')));
+  check('strips zero-width in domain', noLink(S.sanitizeName('buy ev​il.com now')) && noInvisible(S.sanitizeName('buy ev​il.com now')));
+  check('strips bidi override (RLO)', noInvisible(S.sanitizeName('safe ‮moc.live‬ x')));
+  check('folds fullwidth scheme then strips', noLink(S.sanitizeName('go ｈｔｔｐ：／／evil.example')));
+  check('strips exotic TLD .gov (denylist-free)', noLink(S.sanitizeName('visit evil.gov/phish')));
+  check('strips exotic TLD .tech', noLink(S.sanitizeName('grab library.tech/x')));
+  check('strips trailing zero-width padding', S.sanitizeName('MyShelf​​​') === 'MyShelf');
+  check('no surrogate half at the 50 cap', (() => {
+    const out = S.sanitizeName('\u{1F600}'.repeat(60));  // 60 astral chars
+    return [...out].length === S.MAX_NAME && !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(out);
+  })());
+  // Decode path neutralizes concealed content in a raw/crafted link's name
+  const evilHash = await S.encodeSnapshot([{ idType: 'work', id: 'OL1W', status: 'want' }], 'go to htt‍p://evil.example ‮x‬');
   const evilDec = await S.decodeFromHash(evilHash);
-  check('decode name carries no URL', !/https?:\/\/|www\.|evil\.example/.test(evilDec.name || ''));
+  check('decode name carries no URL or invisible char', noLink(evilDec.name || '') && noInvisible(evilDec.name || ''));
 
   // Locale-independent sort: 'B' (0x42) before 'a' (0x61)
   const sorted = S.canonicalizeBooks([
