@@ -18,17 +18,25 @@
   // bidi embeddings/overrides/isolates, BOM, soft hyphen, C0/C1 controls. These
   // both hide content and split tokens to dodge the URL check, so they go first.
   const INVISIBLE_RE = /[\p{Cf}\p{Cc}]/gu;
-  // Explicit scheme / www forms, then ANY hostname.tld shape (denylist-free, so
-  // exotic TLDs like .gov/.tech can't slip through). Applied after NFKC folding.
-  const URL_TOKEN_RE = /(?:https?:\/\/|ftp:\/\/|www\.)\S*/gi;
-  const DOMAIN_RE = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,24}\b(?:[/?#]\S*)?/gi;
+  // (a) any scheme://…, (b) the listed URL/pseudo schemes in `scheme:payload`
+  //     form — the (?=\S) lookahead means a colon followed by a space (an
+  //     ordinary "Title: Subtitle") is NOT touched, (c) www.… forms.
+  const URL_TOKEN_RE = /(?:[a-z][a-z0-9+.-]*:\/\/|(?:https?|ftps?|sftp|wss?|ws|file|blob|javascript|data|vbscript|mailto|tel):(?=\S)|www\.)\S*/gi;
+  // Any hostname.tld in ANY script — labels and TLD may be Unicode letters, so
+  // homoglyph / IDN domains (аррӏе.com, evil.сom, 例.テスト) are caught, not just
+  // ASCII. TLD is 2+ letters; requires a contiguous label.tld (a dot followed by
+  // a space, as in "Vol. 2", never matches). Runs after NFKC folds fullwidth.
+  const DOMAIN_RE = /[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?)*\.\p{L}{2,24}(?:[/?#]\S*)?/gu;
+  // Bare dotted-quad IP addresses (scheme://ip is already handled above).
+  const IPV4_RE = /\b\d{1,3}(?:\.\d{1,3}){3}\b/g;
 
   function sanitizeName(name) {
     let s = String(name || "").replace(INVISIBLE_RE, " ");
     // Fold compatibility/fullwidth homoglyphs (ｈｔｔｐ, 𝗵𝗍𝗍𝗉, ﬁ) to ASCII so a
     // disguised scheme or domain is caught by the strippers below.
     try { s = s.normalize("NFKC"); } catch (e) { /* ancient engine: skip */ }
-    s = s.replace(URL_TOKEN_RE, " ").replace(DOMAIN_RE, " ").replace(/\s+/g, " ").trim();
+    s = s.replace(URL_TOKEN_RE, " ").replace(DOMAIN_RE, " ").replace(IPV4_RE, " ")
+         .replace(/\s+/g, " ").trim();
     // Cap by code point, never splitting a surrogate pair into a lone half.
     return Array.from(s).slice(0, MAX_NAME).join("");
   }

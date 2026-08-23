@@ -81,6 +81,19 @@ const check = (name, cond, extra) => {
     const out = S.sanitizeName('\u{1F600}'.repeat(60));  // 60 astral chars
     return [...out].length === S.MAX_NAME && !/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(out);
   })());
+  // Round-2 URL-fuzz hardening: script-agnostic domain, generic scheme, IPs.
+  const noHostish = (s) => !/(?:https?|ftps?|ws|file|blob|javascript|data|vbscript|mailto|tel):(?:\/\/)?[^\s:]/i.test(s)
+    && !/\S{1,63}\.\p{L}{2,24}/u.test(s) && !/\b\d{1,3}(?:\.\d{1,3}){3}\b/.test(s);
+  check('strips cyrillic-homoglyph domain', noHostish(S.sanitizeName('open аррӏе.com now')));
+  check('strips mixed-script TLD', noHostish(S.sanitizeName('go evil.сom')));
+  check('strips ftps:// scheme + host', noHostish(S.sanitizeName('grab ftps://evil.com/x')));
+  check('strips bare IPv4', noHostish(S.sanitizeName('visit 127.0.0.1 or 8.8.8.8')));
+  check('strips userinfo@host', noHostish(S.sanitizeName('login http://user:pass@evil.com')));
+  check('strips javascript: URI', noHostish(S.sanitizeName('run javascript:alert(1)')));
+  check('strips data: URI', noHostish(S.sanitizeName('data:text/html,<b>x')));
+  check('keeps Title: Subtitle (colon is not a scheme)', S.sanitizeName('Dune: Part Two') === 'Dune: Part Two');
+  check('keeps "Data:" as a title word', S.sanitizeName('Data: A Love Story') === 'Data: A Love Story');
+  check('keeps version-dotted title', S.sanitizeName('v2.0 favorites') === 'v2.0 favorites');
   // Decode path neutralizes concealed content in a raw/crafted link's name
   const evilHash = await S.encodeSnapshot([{ idType: 'work', id: 'OL1W', status: 'want' }], 'go to htt‍p://evil.example ‮x‬');
   const evilDec = await S.decodeFromHash(evilHash);
