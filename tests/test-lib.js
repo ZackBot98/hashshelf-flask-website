@@ -48,7 +48,7 @@ const check = (name, cond, extra) => {
   const hobbit = parsed.books.find(b => b.id === '9780547928241');
   check('status read -> finished', hobbit && hobbit.status === 'finished');
   check('rating kept', hobbit && hobbit.rating === 5);
-  check('review kept with comma', hobbit && hobbit.comment === 'Loved it, twice.');
+  check('reviews are not imported (no comment field)', hobbit && hobbit.comment === undefined);
   check('currently-reading -> reading', parsed.books.find(b => b.id === '9780441013593').status === 'reading');
   check('custom dnf shelf detected', parsed.books.find(b => b.id === '9781234567897').status === 'did not finish');
   check('goodreads rating 0 means unrated', parsed.books.every(b => b.rating !== 0));
@@ -57,29 +57,24 @@ const check = (name, cond, extra) => {
   try { L.parseGoodreadsCsv('foo,bar\n1,2'); } catch { threw = true; }
   check('rejects non-goodreads csv', threw);
 
-  // --- link-free policy (parity with server.py URL_IN_TEXT_RE/BARE_DOMAIN_RE)
-  check('comment: blocks https URLs', L.commentHasUrl('grab it at https://evil.example/x'));
-  check('comment: blocks WWW. any case', L.commentHasUrl('see WWW.evil.example'));
-  check('comment: allows bare domains (real notes cite archive.org)', !L.commentHasUrl('found on archive.org'));
-  check('comment: ordinary text fine', !L.commentHasUrl('Loved it. 4.5 stars, Vol. 2 was better'));
+  // --- shelf-name link rejection (the UI's friendly guard; the hard guarantee
+  //     is HashShelfSnapshot.sanitizeName, tested in test-snapshot.js)
   check('name: blocks bare domains (kept link-free)', L.nameHasUrl('great deals at evil.com'));
+  check('name: blocks https URLs', L.nameHasUrl('read https://evil.example/x'));
   check('name: blocks www forms', L.nameHasUrl('www.evil.example picks'));
   check('name: blocks file-lookalike .zip TLD', L.nameHasUrl('invoice.zip'));
   check('name: blocks .mov TLD', L.nameHasUrl('watch demo.mov'));
   check('name: blocks abuse TLD .icu', L.nameHasUrl('login evil.icu'));
   check('name: ordinary punctuation fine', !L.nameHasUrl('Vol. 2 favorites (J.R.R. picks)'));
   check('name: initials-with-dots fine', !L.nameHasUrl('Books by C.S. Lewis & J.K.'));
-  check('stripUrls removes link, keeps note',
-    L.stripUrls('Loved it! https://evil.example/review full thoughts there') === 'Loved it! full thoughts there');
 
-  // Goodreads reviews often contain links; import strips them, keeps the note
+  // Goodreads reviews (with or without links) are never imported now
   const grUrl = [
     'Book Id,Title,Author,ISBN,ISBN13,My Rating,Average Rating,Number of Pages,Exclusive Shelf,My Review,Bookshelves',
     '1,The Hobbit,J.R.R. Tolkien,"=""0547928246""","=""9780547928241""",5,4.28,366,read,"Great read, see https://my.blog/post for more",fantasy'
   ].join('\n');
   const grUrlBook = L.parseGoodreadsCsv(grUrl).books[0];
-  check('goodreads import strips URLs from reviews',
-    grUrlBook && grUrlBook.comment === 'Great read, see for more' && !L.commentHasUrl(grUrlBook.comment));
+  check('goodreads import drops reviews entirely', grUrlBook && grUrlBook.comment === undefined);
 
   // --- genres (parity cases with tests/test_server.py) --------------------
   check('genre punctuation fold', (await L.normalizeGenres(['Science-fiction'])).includes('Science Fiction'));

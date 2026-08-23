@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, abort, jsonify, request, send_from_directory
 
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("HASHSHELF_DB", os.path.join(ROOT, "data", "hashshelf.db"))
 CONTACT = os.environ.get("HASHSHELF_CONTACT", "https://hashshelf.com")

@@ -11,6 +11,13 @@ security, concurrency, browser behavior) as the final gate before launch.
 > mint rate-limiter, and Campaign 2's URL-in-stored-shelf tests) describe code that
 > no longer exists; they are kept for the record. The client codec, XSS/inert-text
 > rendering, path-traversal, header, and hydration findings are all still current.
+>
+> **Further (v1.9.0):** per-book **comments were removed entirely** and shelf
+> **names shortened + URL-stripped in the codec** (`sanitizeName`, on encode and
+> decode). So findings that mention book *comments* (F3, and Campaign 2's
+> comment cases) no longer apply — a book carries no free text, and the only
+> free text (the name) is neutralized at the codec boundary regardless of how a
+> link was built.
 
 ## Verdict
 

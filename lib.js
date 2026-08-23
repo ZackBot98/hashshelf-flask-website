@@ -3,31 +3,18 @@
 (function(root) {
   // ------------------------------------------------------- link-free policy
 
-  // Shelves are kept link-free — the add-book form and shelf-name field reject
-  // pasteable URLs (names also reject bare domains, since the name is the
-  // shelf's title). This is a client-side courtesy, not a security boundary:
-  // no shelf is stored on a server, and shared shelf text is only ever rendered
-  // as inert, non-clickable text. Goodreads imports strip URLs instead (below).
+  // A shelf carries no free text except its name. nameHasUrl gives the add-shelf
+  // UI a friendly "no links in titles" rejection; the hard guarantee lives in
+  // the codec (HashShelfSnapshot.sanitizeName), which strips URLs and caps
+  // length on every encode AND decode, so a hand-crafted link can't sneak one
+  // in either. Books have no comment field at all.
   const URL_IN_TEXT_RE = /(?:https?:\/\/|ftp:\/\/|www\.)/i;
-  // TLDs rejected as bare domains in shelf names.
+  // TLDs rejected as bare domains in shelf names (mirror of sanitizeName's set).
   const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su)\b/i;
-
-  function commentHasUrl(text) {
-    return URL_IN_TEXT_RE.test(String(text || ''));
-  }
 
   function nameHasUrl(text) {
     const s = String(text || '');
     return URL_IN_TEXT_RE.test(s) || BARE_DOMAIN_RE.test(s);
-  }
-
-  // For imported text (Goodreads reviews often contain links): drop the URLs,
-  // keep the note. Erroring a 300-book import over one link would be hostile.
-  function stripUrls(text) {
-    return String(text || '')
-      .replace(/(?:https?:\/\/|ftp:\/\/|www\.)\S+/gi, '')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
   }
 
   // ------------------------------------------------------------------ CSV
@@ -78,7 +65,7 @@
     const iTitle = col('Title'), iAuthor = col('Author');
     const iIsbn = col('ISBN'), iIsbn13 = col('ISBN13');
     const iRating = col('My Rating'), iShelf = col('Exclusive Shelf');
-    const iReview = col('My Review'), iShelves = col('Bookshelves');
+    const iShelves = col('Bookshelves');
     if (iTitle < 0 || (iIsbn < 0 && iIsbn13 < 0)) {
       throw new Error('That does not look like a Goodreads export (missing Title/ISBN columns).');
     }
@@ -102,14 +89,13 @@
 
       const ratingNum = Number(iRating >= 0 ? cells[iRating] : 0);
       const rating = Number.isFinite(ratingNum) && ratingNum > 0 ? Math.min(5, Math.round(ratingNum)) : undefined;
-      const comment = stripUrls(String((iReview >= 0 ? cells[iReview] : '') || '')).slice(0, 2000);
+      // Reviews are intentionally not imported — books carry no free text.
 
       books.push({
         idType: 'isbn',
         id: isbn,
         status,
-        ...(rating !== undefined ? { rating } : {}),
-        ...(comment ? { comment } : {})
+        ...(rating !== undefined ? { rating } : {})
       });
     }
     return { books, skipped, total: rows.length - 1 };
@@ -538,9 +524,7 @@
     parseCsv,
     parseGoodreadsCsv,
     cleanIsbn,
-    commentHasUrl,
     nameHasUrl,
-    stripUrls,
     normalizeGenres,
     toIsbn10,
     toIsbn13,

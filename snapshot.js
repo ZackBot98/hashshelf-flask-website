@@ -7,6 +7,24 @@
   const allowedIdTypes = new Set(["work", "isbn", "edition"]);
   const allowedStatuses = new Set(["want", "reading", "finished", "did not finish"]);
 
+  // The shelf name is the only free text a shelf carries, and a name can arrive
+  // inside a hand-crafted link that never passed through the UI — so this codec
+  // is the real boundary, not the form. sanitizeName strips anything
+  // link-shaped and hard-caps length; it runs on both encode AND decode, so no
+  // link (crafted, legacy, or imported) can smuggle a URL into a title.
+  const MAX_NAME = 50;
+  const URL_TOKEN_RE = /(?:https?:\/\/|ftp:\/\/|www\.)\S*/gi;
+  const BARE_DOMAIN_RE = /\b[a-z0-9-]+\.(?:com|net|org|io|co|me|us|uk|ly|gg|xyz|ru|cn|info|biz|site|online|top|club|cc|to|tv|link|click|app|dev|shop|store|zip|mov|pro|vip|icu|sbs|cfd|lol|monster|quest|rest|fun|bar|win|bid|loan|stream|download|pizza|space|website|live|world|de|fr|jp|nl|eu|ca|au|in|br|es|it|pl|se|ai|be|ws|pw|su)\b\S*/gi;
+
+  function sanitizeName(name) {
+    return String(name || "")
+      .replace(URL_TOKEN_RE, " ")
+      .replace(BARE_DOMAIN_RE, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, MAX_NAME);
+  }
+
   function clampRating(value) {
     if (value === null || value === undefined || value === "") return undefined;
     const n = Number(value);
@@ -29,15 +47,14 @@
       if (!id || !allowedIdTypes.has(idType)) continue;
       const rating = clampRating(b.rating);
       const status = String(b.status || "want").trim().toLowerCase();
-      const comment = String(b.comment || "").trim();
       if (!allowedStatuses.has(status)) continue;
 
-      // Property insertion order is canonicalized here
+      // Property insertion order is canonicalized here. Books carry no free
+      // text — any `comment` on an incoming (e.g. legacy) book is dropped.
       const book = {
         idType,
         id,
         ...(rating !== undefined ? { rating } : {}),
-        ...(comment ? { comment } : {}),
         status
       };
       byKey.set(`${idType}:${id}`, book);
@@ -50,9 +67,9 @@
   }
 
   function canonicalSnapshot(books, name) {
-    const trimmedName = String(name || "").trim();
+    const cleanName = sanitizeName(name);
     const snapshot = { v: VERSION };
-    if (trimmedName) snapshot.name = trimmedName; // fixed key order: v, name, books
+    if (cleanName) snapshot.name = cleanName; // fixed key order: v, name, books
     snapshot.books = canonicalizeBooks(books);
     return snapshot;
   }
@@ -228,7 +245,11 @@
     if (!data || data.v !== VERSION || !Array.isArray(data.books)) {
       throw new Error("Unsupported or invalid snapshot schema");
     }
-    // Re-canonicalize for UI consumption
+    // Re-canonicalize for UI consumption. sanitizeName neutralizes any URL a
+    // hand-crafted or legacy link tried to hide in the title; canonicalizeBooks
+    // drops any per-book comment. This is the enforcement boundary.
+    data.name = sanitizeName(data.name);
+    if (!data.name) delete data.name;
     data.books = canonicalizeBooks(data.books);
     return data;
   }
@@ -238,6 +259,8 @@
     decodeFromHash,
     canonicalizeBooks,
     canonicalSnapshot,
+    sanitizeName,
+    MAX_NAME,
     version: VERSION,
     hashPrefix: NEW_HASH_PREFIX
   };

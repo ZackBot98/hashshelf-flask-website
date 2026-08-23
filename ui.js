@@ -12,7 +12,6 @@
   const titleSuggestionsEl = $('#titleSuggestions');
   const ratingEl = $('#rating');
   const statusEl = $('#status');
-  const commentEl = $('#comment');
   const addBookBtn = $('#addBookBtn');
   const clearFormBtn = $('#clearFormBtn');
   const formCoverPreview = $('#formCoverPreview');
@@ -255,13 +254,10 @@
     status.textContent = b.status;
     const genres = document.createElement('span');
     genres.className = 'genre-tags';
-    const comment = document.createElement('div');
-    comment.className = 'authors';
-    comment.textContent = b.comment || '';
     const buy = document.createElement('div');
     buy.className = 'buy-links';
     tags.append(rating, status, genres);
-    meta.append(title, authors, tags, comment, buy);
+    meta.append(title, authors, tags, buy);
     item.append(cover, meta);
     return { item, coverEl: cover, titleEl: title, authorsEl: authors, genresEl: genres, buyEl: buy };
   }
@@ -578,7 +574,6 @@
     bookIdEl.title = b.id;
     ratingEl.value = b.rating ?? '';
     statusEl.value = b.status;
-    commentEl.value = b.comment || '';
     addBookBtn.textContent = 'Update book';
     OpenLibrary.fetchBookMeta(b.idType, b.id).then((m) => {
       if (titleSearchEl && (m?.title || titleSearchEl.value === '')) {
@@ -604,7 +599,6 @@
     bookIdEl.title = '';
     ratingEl.value = '';
     statusEl.value = 'want';
-    commentEl.value = '';
     addBookBtn.textContent = 'Add book';
     if (titleSearchEl) titleSearchEl.value = '';
     if (formCoverPreview) {
@@ -614,11 +608,8 @@
     clearSuggestions();
   }
 
-  // Book ids must be a shape OpenLibrary can hydrate; comments are capped so a
-  // shared link stays a sane length. (Matches the id/comment shapes the app
-  // has always used.)
+  // Book ids must be a shape OpenLibrary can hydrate. Books carry no free text.
   const ID_RE = /^[A-Za-z0-9 ._:-]{1,64}$/;
-  const MAX_COMMENT = 2000;
 
   function addOrUpdateBook(e) {
     e.preventDefault();
@@ -626,18 +617,13 @@
     const id = bookIdEl.value.trim();
     const ratingVal = ratingEl.value;
     const status = statusEl.value.trim();
-    const comment = commentEl.value.trim().slice(0, MAX_COMMENT);
     const rating = ratingVal === '' ? undefined : Number(ratingVal);
     if (!id) return;
     if (!ID_RE.test(id)) {
       showNotice('That ID has characters HashShelf can’t use. Use an OpenLibrary Work ID (e.g. OL45804W) or an ISBN, or pick a search result.', 'error');
       return;
     }
-    if (HashShelfLib.commentHasUrl(comment)) {
-      showNotice('Links aren’t allowed in comments — shelves stay link-free so a shared page can never carry spam.', 'error');
-      return;
-    }
-    const entry = { idType, id, status, ...(rating !== undefined ? { rating } : {}), ...(comment ? { comment } : {}) };
+    const entry = { idType, id, status, ...(rating !== undefined ? { rating } : {}) };
     if (editIndex !== null) {
       books[editIndex] = entry;
       for (let i = books.length - 1; i >= 0; i--) {
@@ -1045,13 +1031,15 @@
 
     shelfSelect.addEventListener('change', () => switchShelf(shelfSelect.value));
     newShelfBtn.addEventListener('click', () => {
-      const name = (prompt('Shelf name (this is the title on links you share):', 'New shelf') || '').trim();
-      if (!name) return;
-      if (HashShelfLib.nameHasUrl(name)) {
-        showNotice('Links and web addresses aren’t allowed in shelf names — the name becomes the title on shared pages.', 'error');
+      const raw = (prompt('Shelf name — a short title (it appears on links you share):', 'New shelf') || '').trim();
+      if (!raw) return;
+      if (HashShelfLib.nameHasUrl(raw)) {
+        showNotice('Links and web addresses aren’t allowed in shelf names — keep it a short title.', 'error');
         return;
       }
-      const shelf = { id: newId(), name: name.slice(0, 60), books: [] };
+      const name = HashShelfSnapshot.sanitizeName(raw);
+      if (!name) return;
+      const shelf = { id: newId(), name, books: [] };
       store.shelves.push(shelf);
       saveShelves();
       switchShelf(shelf.id);
@@ -1059,13 +1047,15 @@
     });
     renameShelfBtn.addEventListener('click', () => {
       const shelf = activeShelf();
-      const name = (prompt('Rename shelf (this is the title on links you share):', shelf.name) || '').trim();
-      if (!name) return;
-      if (HashShelfLib.nameHasUrl(name)) {
-        showNotice('Links and web addresses aren’t allowed in shelf names — the name becomes the title on shared pages.', 'error');
+      const raw = (prompt('Rename shelf — a short title (it appears on links you share):', shelf.name) || '').trim();
+      if (!raw) return;
+      if (HashShelfLib.nameHasUrl(raw)) {
+        showNotice('Links and web addresses aren’t allowed in shelf names — keep it a short title.', 'error');
         return;
       }
-      shelf.name = name.slice(0, 60);
+      const name = HashShelfSnapshot.sanitizeName(raw);
+      if (!name) return;
+      shelf.name = name;
       saveShelves();
       renderShelfSelect();
       renderEditorList();

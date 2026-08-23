@@ -13,10 +13,10 @@ Live at **[hashshelf.com](https://hashshelf.com)** · [About / manifesto](https:
 ## What it does
 
 - Add books by OpenLibrary Work ID (e.g. `OL45804W`) or ISBN, or search by title.
-- Set rating (0–5), status (`want` / `reading` / `finished` / `did not finish`), and an optional comment.
+- Set rating (0–5) and status (`want` / `reading` / `finished` / `did not finish`). Books carry no free-text notes.
 - Hydrate titles/authors/covers/genres from OpenLibrary — via the HashShelf API cache when available, directly from OpenLibrary otherwise.
 - **Multiple shelves**, switched locally; each shares as its own link.
-- **Goodreads CSV import**: drop in a `goodreads_library_export.csv` and the shelf fills in. Maps Goodreads' shelves to statuses, keeps ratings and reviews, and reports rows it had to skip (no ISBN).
+- **Goodreads CSV import**: drop in a `goodreads_library_export.csv` and the shelf fills in. Maps Goodreads' shelves to statuses and keeps ratings (written reviews are not imported), and reports rows it had to skip (no ISBN).
 - **Compare shelves**: paste someone's link to see overlap, books only they have, and where your ratings disagree most — then add their books to your want list in one click.
 - **Year in review**: a shareable PNG card (covers, counts, top authors/genres, rating distribution), rendered entirely client-side.
 - Filter by status **and genre**; genres are derived from OpenLibrary subjects, not stored in the link.
@@ -36,17 +36,18 @@ Canonical JSON (deterministic ordering/whitespace):
 ```json
 {
   "v": 1,
-  "name": "optional string",
+  "name": "optional short title",
   "books": [
-    { "idType": "work|edition|isbn", "id": "string", "rating": 0, "comment": "string", "status": "want|reading|finished|did not finish" }
+    { "idType": "work|edition|isbn", "id": "string", "rating": 0, "status": "want|reading|finished|did not finish" }
   ]
 }
 ```
 
 Canonicalization rules:
 
-- `books` normalized, deduped per `(idType, id)` (last write wins), and sorted by `id` asc (tie-break `idType`), using locale-independent code-unit comparison.
-- Keys inserted in fixed order; empty/undefined fields omitted; comments trimmed.
+- `books` normalized, deduped per `(idType, id)` (last write wins), and sorted by `id` asc (tie-break `idType`), using locale-independent code-unit comparison. Books carry no free text — a `comment` on any incoming book is dropped.
+- `name` is the only free text; `sanitizeName` (in `snapshot.js`) strips any URL or bare domain and caps it at 50 chars. This runs on **both encode and decode**, so a hand-crafted or legacy link can't smuggle a link into the title.
+- Keys inserted in fixed order; empty/undefined fields omitted.
 
 Encoding:
 
@@ -157,8 +158,8 @@ id configured — if you run a copy locally, clear or replace it.
 - Strict security headers on every response: CSP (`script-src 'self'` — no inline code exists anywhere, enforced by tests; only OpenLibrary/Internet Archive hosts allowed for data and covers), HSTS, `nosniff`, frame denial, and a tight referrer policy. Third-party scripts are browser-refused, not merely absent.
 - Snapshots (the shelf encoding carried in a link) are deterministic and integrity-checked — corruption detection, not authentication.
 - Shelf data leaves the browser only inside a link you choose to share, and that link — a URL fragment — is never transmitted to any server.
-- All rendering uses `textContent` — names and comments from a shared link cannot inject HTML and are never turned into clickable links.
-- The client keeps shelves link-free as a courtesy (the add-book form and shelf-name field reject pasteable URLs; Goodreads import strips them), but the real guarantee is that shared shelf text is only ever rendered as inert text.
+- All rendering uses `textContent` — a shelf name from a shared link cannot inject HTML and is never turned into a clickable link.
+- **The codec is the link-free boundary.** A shelf's only free text is its (short) name; books have no comment field at all. `sanitizeName` strips URLs and bare domains and caps length on **both encode and decode**, so a hand-crafted or legacy link can't smuggle a link into a title either. The shelf-name form adds a friendly rejection on top.
 
 ## Contributing
 

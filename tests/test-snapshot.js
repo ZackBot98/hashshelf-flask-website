@@ -34,27 +34,41 @@ const check = (name, cond, extra) => {
   check('SHA-256 matches Node crypto across 201 padding boundaries', shaFails === 0, shaFails);
   global.fflate = realDeflate;
 
-  // Real-deflate roundtrip with unicode
+  // Real-deflate roundtrip with unicode name; comments are dropped entirely
   const books = [
     { idType: 'work', id: 'OL45804W', rating: 5, comment: 'héllo — ✓ 日本語', status: 'finished' },
     { idType: 'isbn', id: '9780140449136', rating: 0, status: 'did not finish' },
   ];
-  const hash = await S.encodeSnapshot(books, 'Zack');
+  const hash = await S.encodeSnapshot(books, 'Zäck 日本語');
   const dec = await S.decodeFromHash(hash);
-  check('roundtrip preserves books/name/unicode', dec.books.length === 2 && dec.name === 'Zack'
-    && dec.books.find(b => b.id === 'OL45804W').comment.includes('日本語'));
+  check('roundtrip preserves books/name/unicode', dec.books.length === 2 && dec.name === 'Zäck 日本語');
+  check('comments are stripped on encode/decode', dec.books.every(b => b.comment === undefined));
   check('rating 0 distinct from unrated', dec.books.find(b => b.id === '9780140449136').rating === 0);
 
   // Determinism: input order must not matter
-  const h2 = await S.encodeSnapshot([books[1], books[0]], 'Zack');
+  const h2 = await S.encodeSnapshot([books[1], books[0]], 'Zäck 日本語');
   check('order-independent encoding', hash === h2);
 
-  // Dedupe keep-last per (idType, id)
+  // Dedupe keep-last per (idType, id); comment on either is dropped
   const canon = S.canonicalizeBooks([
     { idType: 'work', id: 'OL1W', rating: 2, status: 'want' },
-    { idType: 'work', id: 'OL1W', rating: 5, comment: 'kept', status: 'finished' },
+    { idType: 'work', id: 'OL1W', rating: 5, comment: 'dropped', status: 'finished' },
   ]);
-  check('dedupe keeps last write', canon.length === 1 && canon[0].rating === 5 && canon[0].comment === 'kept');
+  check('dedupe keeps last write', canon.length === 1 && canon[0].rating === 5);
+  check('canonicalize drops comments', canon[0].comment === undefined);
+
+  // Name sanitization is the real boundary: it runs on encode AND decode, so a
+  // hand-crafted link cannot smuggle a URL/domain into the title.
+  check('sanitizeName strips http URLs', S.sanitizeName('Reads visit http://evil.example/x now') === 'Reads visit now');
+  check('sanitizeName strips www', S.sanitizeName('deals www.evil.example here') === 'deals here');
+  check('sanitizeName strips bare domains', S.sanitizeName('grab evil.com today') === 'grab today');
+  check('sanitizeName strips .zip lookalikes', S.sanitizeName('open invoice.zip') === 'open');
+  check('sanitizeName keeps legit titles', S.sanitizeName('Vol. 2 (J.R.R. picks)') === 'Vol. 2 (J.R.R. picks)');
+  check('sanitizeName caps length to MAX_NAME', S.sanitizeName('x'.repeat(200)).length === S.MAX_NAME);
+  // Decode path neutralizes a URL a raw/crafted link tried to hide in the name
+  const evilHash = await S.encodeSnapshot([{ idType: 'work', id: 'OL1W', status: 'want' }], 'go to http://evil.example');
+  const evilDec = await S.decodeFromHash(evilHash);
+  check('decode name carries no URL', !/https?:\/\/|www\.|evil\.example/.test(evilDec.name || ''));
 
   // Locale-independent sort: 'B' (0x42) before 'a' (0x61)
   const sorted = S.canonicalizeBooks([

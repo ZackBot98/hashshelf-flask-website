@@ -20,7 +20,7 @@ network access.
 ### 2.1 Core flows (run against `python server.py`, http://localhost:8000)
 
 - [ ] Search by title → "Searching the catalog…" shows immediately, then suggestions with covers; gibberish shows a no-matches row; Escape dismisses → select → form fills with work ID + cover preview
-- [ ] Add book with rating/status/comment → row renders, hydrates title/author/cover/genre chips
+- [ ] Add book with rating/status → row renders, hydrates title/author/cover/genre chips (no comment field exists)
 - [ ] Add the same book again → updates in place with notice, no duplicate
 - [ ] Edit and Delete a row; rating `0` displays as `0 ★`, unrated as `No rating`
 - [ ] URL hash updates live as you edit; an empty shelf → clean URL
@@ -32,7 +32,7 @@ network access.
 
 ### 2.2 v1.3 features
 
-- [ ] Import a real `goodreads_library_export.csv` → correct counts in notice; skipped-no-ISBN titles listed; statuses/ratings/reviews mapped
+- [ ] Import a real `goodreads_library_export.csv` → correct counts in notice; skipped-no-ISBN titles listed; statuses/ratings mapped (reviews are not imported)
 - [ ] Shelves: create, rename, delete (blocked at one shelf); books isolated per shelf; counts in dropdown; survives reload; renaming updates the live link and the shared title
 - [ ] Genre filter populates from hydrated books and filters correctly; status+genre combine
 - [ ] Compare: paste a link; tiles + four sections render; "Add their N books" merges as `want`
